@@ -1144,8 +1144,16 @@
   // Single static "episode" row for movies: poster thumb, "Movie" number
   // badge, title, and runtime — same card styling as episodes so the
   // stream wiring (badges + globe button) attaches unchanged.
+  // Duration label: "45 min" under an hour, "1h 30m" / "2h" at/over 60.
+  function fmtDur(min) {
+    min = Math.round(min || 0);
+    if (min < 60) return min + ' min';
+    var h = Math.floor(min / 60), m = min % 60;
+    return h + 'h' + (m ? ' ' + m + 'm' : '');
+  }
+
   function movieRowHtml(d) {
-    var mins = d.durationMin ? d.durationMin + ' min' : '';
+    var mins = d.durationMin ? fmtDur(d.durationMin) : '';
     var label = String(d.format || '').toUpperCase() === 'MOVIE' ? 'Movie' : 'Episode';
     var key = (d.provider || 'anilist') + ':' + d.id + ':ep:1';
     return '<section class="online-block" data-ep-block data-ep-movie>' +
@@ -1215,7 +1223,7 @@
     var num = isCh ? 'Ch ' + it.n : String(it.n).padStart(2, '0');
     var soon = it.ts && it.ts > Date.now();
     var thumb = it.thumb || cover || '';
-    var sub = [it.date, it.minutes ? it.minutes + ' min' : (it.pages ? it.pages + ' pages' : '')]
+    var sub = [it.date, it.minutes ? fmtDur(it.minutes) : (it.pages ? it.pages + ' pages' : '')]
       .filter(Boolean).join(' · ');
     var foot = soon
       ? cdBoxesHtml(it.ts, true)
