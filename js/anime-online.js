@@ -1051,6 +1051,9 @@
     var counts = isManga
       ? [d.chapters ? d.chapters + ' chapters' : '', d.volumes ? d.volumes + ' volumes' : '']
       : [(d.episodes && !isMovie) ? d.episodes + ' episodes' : ''];
+    var meta = [prettyStatus(d.status, isManga), d.year || '', formatLabel(d)]
+      .concat(counts)
+      .filter(Boolean).join(' · ');
     // Tappable rating: opens the rating-details + reviews popup. The review
     // data rides along with the detail query, so the popup opens instantly.
     var hasRatingData = d.score != null &&
@@ -1112,25 +1115,18 @@
             '</span><span class="poster-title">' +
             esc(r.title) + '</span><span class="poster-meta">' + esc(r.kind || '') + '</span></a>';
         }).join('') + '</div></section>' : '';
-    // Professional header layout: kicker + rating share the top row, status
-    // becomes a pill, studios collapse to the main studio + date on one
-    // subtle line. The watch row (injected later) is ordered first via CSS.
-    var statusPill = prettyStatus(d.status, isManga)
-      ? '<span class="status-pill">' + esc(prettyStatus(d.status, isManga)) + '</span>' : '';
-    var metaRest = [d.year || '', formatLabel(d)].concat(counts).filter(Boolean).join(' · ');
-    var subLine = [(d.studios || [])[0] || '', d.startText || ''].filter(Boolean).join(' · ');
+    var studios = (d.studios || []).length ? '<p class="detail-studios">' + esc(d.studios.join(' · ')) + '</p>' : '';
     return '<div class="online-detail" data-tone-root>' +
       (d.banner ? '<div class="detail-banner"><img src="' + esc(d.banner) + '" alt="" loading="lazy"></div>' : '') +
       '<div class="online-wrap"><a class="back-link" href="' + backHref + '">' +
         icon('arrowLeft') + '<span>' + (isManga ? 'Manga' : 'Discover') + '</span></a>' + air +
         '<header class="detail-hero"><span class="poster-img big"><img src="' + esc(d.image) +
           '" alt="' + esc(d.title) + ' poster"></span>' +
-        '<div class="detail-copy"><div class="detail-toprow"><p class="detail-kicker">' +
-          esc(providerName()) + '</p>' + ratingBtn + '</div>' +
-          '<h1>' + esc(d.title) + '</h1>' +
-          '<p class="detail-meta">' + statusPill + (statusPill && metaRest ? ' ' : '') +
-            esc(metaRest) + '</p>' +
-          (subLine ? '<p class="detail-sub">' + esc(subLine) + '</p>' : '') +
+        '<div class="detail-copy"><p class="detail-kicker">' + esc(providerName()) + '</p>' +
+          '<h1>' + esc(d.title) + '</h1><p class="detail-meta">' + esc(meta) + '</p>' +
+          (ratingBtn ? '<p class="detail-meta">' + ratingBtn + '</p>' : '') +
+          (d.startText ? '<p class="detail-meta dim">' + esc(d.startText) + '</p>' : '') +
+          studios +
           '<div class="genre-tags">' + (d.genres || []).map(function (g) {
             return '<span class="genre-tag">' + esc(g) + '</span>';
           }).join('') + '</div>' + (trailer || watchOrder
