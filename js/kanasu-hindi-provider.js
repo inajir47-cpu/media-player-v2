@@ -343,6 +343,11 @@
                   else if (u.indexOf('https://rubystm.com') === 0) job = hiRuby(u);
                   else if (u.indexOf('https://vidmoly.net/') === 0) job = hiVidmoly(u);
                   else job = Promise.reject(new Error('unsupported host'));
+                  if (window.console && console.log) console.log('[hi] trying', u.slice(0, 60));
+                  job = job.catch(function (e) {
+                    if (window.console && console.log) console.log('[hi] failed', u.slice(8, 40), String((e && e.message) || e).slice(0, 80));
+                    throw e;
+                  });
                   return job.then(function (s) { return s; }, function () { return attempt(i + 1); });
                 }
                 return attempt(0);

@@ -566,7 +566,18 @@
         buildAudioMenu(audioTracksFromHls(data.audioTracks));
       });
       hls.on(window.Hls.Events.ERROR, function (_, data) {
-        if (data && data.fatal) playerFail(shell, 'Playback error — try another provider');
+        if (data && data.fatal) {
+          var reason = '';
+          try {
+            if (data.response && data.response.code) reason = ' [HTTP ' + data.response.code + ']';
+            else if (data.details) reason = ' [' + data.details + ']';
+            if (data.frag && data.frag.url) {
+              var hu = String(data.frag.url);
+              reason += ' ' + hu.slice(0, hu.indexOf('/', 8) > 0 ? hu.indexOf('/', 8) : 60);
+            }
+          } catch (e) {}
+          playerFail(shell, 'Playback error — try another provider' + reason);
+        }
       });
       // Fall back to the API's track list if the manifest exposes none.
       hls.on(window.Hls.Events.MANIFEST_PARSED, function () {
