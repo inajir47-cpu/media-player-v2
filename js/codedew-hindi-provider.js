@@ -15,6 +15,21 @@
 
 var CODEDEW = 'https://codedew.com';
 var EMBED_HOST = 'https://argon.razorshell.space';
+var WORKER = 'https://mpv2-hls-proxy.gmpdi020.workers.dev';
+
+// Route through the Cloudflare Worker (UAE edge, near the user's phone).
+// codedew.com blocks datacenter IPs but the worker's edge near the user
+// (UAE) uses a residential-range IP. The worker adds CORS headers.
+function stB64url(s) {
+  var bytes = new TextEncoder().encode(s), bin = '', i;
+  for (i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function wproxy(url, ref) {
+  var u = WORKER + '/hls?d=' + stB64url(url);
+  if (ref) u += '&ref=' + stB64url(ref);
+  return u;
+}
 
 /* ---------- _juicycodes decoder (ported from xre000001-ai/raretoons-stremio) ---------- */
 var JUICY_ALPHABET = ['`', '%', '-', '+', '*', '$', '!', '_', '^', '='];
@@ -67,9 +82,11 @@ function juicyExtract(html) {
 /* ---------- helpers ---------- */
 function cdGetText(url, timeoutMs) {
   var ms = timeoutMs || 25000;
+  // Via the Cloudflare Worker (adds CORS, uses UAE edge IP)
+  var proxied = wproxy(url);
   return new Promise(function (res, rej) {
     var to = setTimeout(function () { rej(new Error('Request timed out')); }, ms);
-    fetch(url, { redirect: 'follow' }).then(function (r) {
+    fetch(proxied).then(function (r) {
       clearTimeout(to);
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.text();
@@ -135,23 +152,20 @@ function cdEpisodes(pageUrl) {
 
 /* ---------- watch: token -> short id -> embed -> decode -> m3u8 ---------- */
 function cdResolveToken(episodeUrl) {
-  // Step 1: fetch the episode page (zipper or multiquality). The zipper
-  // endpoint 302-redirects to /multiquality/?url=<shortId>.
-  // fetch() follows redirects; we read the final URL.
-  return fetch(episodeUrl, { redirect: 'follow' }).then(function (r) {
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    var finalUrl = r.url;
-    var m = finalUrl.match(/[?&]url=([A-Za-z0-9]+)/);
-    if (!m) throw new Error('No video ID in redirect');
-    return { fileId: m[1], html: null, finalUrl: finalUrl };
-  }).then(function (st) {
-    // Step 2: fetch the multiquality page to confirm, then the embed page.
-    // The multiquality HTML embeds: <iframe src="https://argon.razorshell.space/embed/<id>">
-    return cdGetText(st.finalUrl).then(function (html) {
-      var m = html.match(/argon\.razorshell\.space\/embed\/([A-Za-z0-9]+)/);
-      var fid = m ? m[1] : st.fileId;
-      return { fileId: fid };
-    });
+  // Fetch the episode page via the worker. The /zipper/ endpoint 302-redirects
+  // to /multiquality/?url=<shortId>; the worker follows it. We extract the
+  // file ID from the HTML (iframe src or fid variable) instead of the URL.
+  return cdGetText(episodeUrl).then(function (html) {
+    // Try iframe src first: <iframe src="https://argon.razorshell.space/embed/<id>">
+    var m = html.match(/argon\.razorshell\.space\/embed\/([A-Za-z0-9]+)/);
+    if (m) return { fileId: m[1] };
+    // Try fid variable: const fid = "<id>"
+    var m2 = html.match(/(?:fid|fileId)\s*=\s*["']([A-Za-z0-9]{8,})["']/);
+    if (m2) return { fileId: m2[1] };
+    // Try ?url= in the HTML
+    var m3 = html.match(/[?&]url=([A-Za-z0-9]+)/);
+    if (m3) return { fileId: m3[1] };
+    throw new Error('No video ID found');
   });
 }
 
@@ -181,27 +195,29 @@ function cdWatch(episodeUrl) {
   });
 }
 
-/* ---------- hls.js custom loader: fetch with the embed-page Referer ----------
-   The JuicyCodes CDN requires the player-page Referer on every request
-   (master, variant, segments, keys). Browsers forbid setting the Referer
-   header manually, but the fetch() `referrer` option is allowed. */
+/* ---------- hls.js custom loader: fetch via worker with Referer ----------
+   The JuicyCodes CDN requires the player-page Referer on every request.
+   We route through the Cloudflare Worker (UAE edge): it sets the Referer,
+   and its IP matches the IP-lock from when it resolved the stream URL. */
 function cdHlsConfig(referer) {
   if (!window.Hls) return {};
   var BaseLoader = window.Hls.DefaultConfig.loader;
-  function RefererLoader(config) {
+  function WorkerLoader(config) {
     BaseLoader.call(this, config);
   }
-  RefererLoader.prototype = Object.create(BaseLoader.prototype);
-  RefererLoader.prototype.constructor = RefererLoader;
-  RefererLoader.prototype.loadInternal = function (context, config, callbacks) {
+  WorkerLoader.prototype = Object.create(BaseLoader.prototype);
+  WorkerLoader.prototype.constructor = WorkerLoader;
+  WorkerLoader.prototype.loadInternal = function (context, config, callbacks) {
     var self = this;
-    // Use fetch with referrer; fall back to XHR on failure
-    fetch(context.url, { referrer: referer }).then(function (r) {
+    // Route through worker with the embed-page Referer
+    var url = wproxy(context.url, referer);
+    fetch(url).then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.arrayBuffer();
     }).then(function (buf) {
-      var stats = { trequest: performance.now(), tfirst: performance.now(),
-        tload: performance.now(), loaded: buf.byteLength, total: buf.byteLength };
+      var now = performance.now();
+      var stats = { trequest: now, tfirst: now, tload: now,
+        loaded: buf.byteLength, total: buf.byteLength };
       callbacks.onSuccess({ url: context.url, data: buf }, stats, context);
     }).catch(function (e) {
       // Fall back to the default XHR loader
@@ -209,8 +225,8 @@ function cdHlsConfig(referer) {
     });
   };
   return {
-    pLoader: RefererLoader,
-    fLoader: RefererLoader,
+    pLoader: WorkerLoader,
+    fLoader: WorkerLoader,
     maxBufferLength: 30
   };
 }
