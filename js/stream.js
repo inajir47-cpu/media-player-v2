@@ -571,7 +571,10 @@
           try {
             if (data.response && data.response.code) reason = ' [HTTP ' + data.response.code + ']';
             else if (data.details) reason = ' [' + data.details + ']';
-            if (data.frag && data.frag.url) {
+            if (s && s.referer) {
+              var rh = String(s.referer).match(/^https?:\/\/([^\/]+)/i);
+              if (rh) reason += ' via ' + rh[1];
+            } else if (data.frag && data.frag.url) {
               var hu = String(data.frag.url);
               reason += ' ' + hu.slice(0, hu.indexOf('/', 8) > 0 ? hu.indexOf('/', 8) : 60);
             }
