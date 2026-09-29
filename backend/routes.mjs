@@ -138,6 +138,14 @@ async function handleProxy(req, res) {
   if (xreferer) headers.Referer = xreferer;
   else if (animeId) headers.Referer = 'https://flixcloud.cc/';
   if (xorigin) headers.Origin = xorigin;
+  // Hindi-2 variants use #EXT-X-BYTERANGE: hls.js requests each "segment"
+  // with a Range header for its byte slice of the file. Forward it —
+  // without it the CDN returns the entire file for every segment and
+  // playback stalls at 0:00.
+  const rangeHeader = req.headers.range;
+  if (rangeHeader && /^bytes=\d*-\d*$/.test(String(rangeHeader).trim())) {
+    headers['Range'] = String(rangeHeader).trim();
+  }
 
   let body;
   if (req.method === 'POST') {
@@ -188,6 +196,15 @@ async function handleProxy(req, res) {
     res.setHeader('Content-Type', contentType);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cache-Control', 'public, max-age=3600');
+    // Byte-range segment (Hindi-2): forward the 206 status + range headers
+    // so hls.js accepts the partial content.
+    if (r.status === 206) {
+      res.status(206);
+      const cr = r.headers.get('content-range');
+      if (cr) res.setHeader('Content-Range', cr);
+      const ar = r.headers.get('accept-ranges');
+      if (ar) res.setHeader('Accept-Ranges', ar);
+    }
     return res.send(buf);
   } catch (e) {
     return res.status(502).json({ error: e?.message || 'Proxy failed' });
