@@ -261,8 +261,7 @@
       if (slideEl.classList.contains('active')) playMutedHero(v);
       return;
     }
-    var anilistId = it.provider === 'anilist' ? it.id : null;
-    fetchOpeningVideo(anilistId, it.title).then(function (url) {
+    sharedOpVideoUrl(it).then(function (url) {
       if (!url || !v.isConnected) return;
       v.dataset.heroSrc = url;
       v.src = url;
@@ -821,6 +820,25 @@
     return p;
   }
 
+  // One shared opening-video pipeline for the hero carousel, TOP 010 and the
+  // detail page (see js/op-videos.js): the same anime resolves to the same
+  // file, the lookup is cached persistently, and the service worker downloads
+  // the file once and reuses it everywhere. Falls back to fetchOpeningVideo
+  // when the shared module is unavailable or finds nothing.
+  function sharedOpVideoUrl(item) {
+    function legacy() {
+      var anilistId = item && item.provider === 'anilist' ? item.id : null;
+      return fetchOpeningVideo(anilistId, item && item.title);
+    }
+    var ov = window.MPV2 && window.MPV2.OPVideos;
+    if (ov && item && item.provider && item.id) {
+      return ov.playUrl(item.provider, item.id, item.title).then(function (url) {
+        return url || legacy();
+      });
+    }
+    return legacy();
+  }
+
   function detailVideoAllowed() {
     try {
       var s = JSON.parse(localStorage.getItem('mpv2_settings_v1') || '{}');
@@ -835,8 +853,7 @@
   function mountDetailVideo(mount, d, mediaType) {
     var isManga = (d.mediaType || mediaType) === 'MANGA';
     if (isManga || !detailVideoAllowed()) return;
-    var anilistId = d.provider === 'anilist' ? d.id : null;
-    fetchOpeningVideo(anilistId, d.title).then(function (url) {
+    sharedOpVideoUrl(d).then(function (url) {
       if (!url) return;
       var det = mount.querySelector('.online-detail');
       if (!det) return;
