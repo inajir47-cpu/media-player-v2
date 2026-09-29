@@ -49,6 +49,19 @@ Obey this on every update. Updated 2026-09-30.
    `xreferer=https://abyssplayer.com/` (CDN 403s without that Referer;
    the phone browser cannot spoof it, so it must be proxied).
    Direct media CDN observed: `*.sssrr.org`.
+3c. **Hindi-1 (ToonStream) server rot, 2026-09-30**: the episode pages still
+   resolve but the video servers died one by one — turbonewvid's HLS
+   segments are Google-Drive PNG placeholders to datacenter IPs (the
+   manifest parses, so the player showed a duration then failed with
+   hls.js `mediaSourceRequiresReset`), rubystm.com/dl and vidmoly's
+   vmeas.cloud are HTTP 403 to Render. Fix: `js/kanasu-hindi-provider.js`
+   now tries the episode page's **abyssplayer.com** iframe first
+   (`hiAbyss`, reusing `window.h3AbyssDecrypt` from
+   `js/ahd-hindi-provider.js` — same AES-256-CTR extraction, MP4 via
+   `/api/stream/r` with `xreferer=https://abyssplayer.com/`), and
+   `hiResolveHls` rejects any variant playlist containing
+   `googleusercontent.com` so a Drive-blocked server fails over instead
+   of building a broken playlist.
 4. **A source dies completely**: **remove the provider button** — standing rule, no fake buttons.
    Tell Imran plainly what died.
 9. **Stream CDN returns "Invalid signature" / endless loading** (happened with Hindi-2's

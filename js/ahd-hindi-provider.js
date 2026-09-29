@@ -258,4 +258,6 @@ function h3Watch(title, n) {
 window.h3Search = h3Search;
 window.h3HasEpisode = h3HasEpisode;
 window.h3Watch = h3Watch;
+// Shared with kanasu-hindi-provider.js (Hindi-1's abyssplayer fallback).
+window.h3AbyssDecrypt = h3AbyssDecrypt;
 })();

@@ -273,6 +273,28 @@
                 return { url: m[1], type: 'hls', referer: embedUrl, origin: 'https://vidmoly.net' };
               });
             }
+            function hiAbyss(embedUrl) {
+              // Abyssplayer embed (same host cracked for Hindi-3): the page's
+              // `datas` blob decrypts (AES-256-CTR, key = MD5-hex of
+              // user_id:slug:md5_id) to direct MP4s on sssrr.org, which serve
+              // fine through our proxy with the abyssplayer Referer.
+              var ABYSS_REF = 'https://abyssplayer.com/';
+              return dmGetText(hiProxyX(embedUrl, ABYSS_REF, null), 20000, false).then(function (html) {
+                var dm = String(html).match(/const\s+datas\s*=\s*"((?:[^"\\]|\\.)*)"/);
+                if (!dm) throw new Error('abyss: no datas');
+                var obj = JSON.parse(atob(JSON.parse('"' + dm[1] + '"')));
+                if (!obj || !obj.media) throw new Error('abyss: no media');
+                var keyStr = obj.user_id + ':' + obj.slug + ':' + obj.md5_id;
+                return window.h3AbyssDecrypt(obj.media, keyStr);
+              }).then(function (data) {
+                var fds = (data && data.mp4 && data.mp4.fristDatas) || [], best = null, i;
+                for (i = 0; i < fds.length; i++) {
+                  if (fds[i] && fds[i].url && (!best || (fds[i].size || 0) > (best.size || 0))) best = fds[i];
+                }
+                if (!best) throw new Error('abyss: no playable file');
+                return { url: best.url, type: 'mp4', referer: ABYSS_REF, origin: ABYSS_REF };
+              });
+            }
             function hiTurbo(embedUrl) {
               // TurboNewVid embed page carries the m3u8 in plain text:
               //   var urlPlay = \'https://cdn3.turbonewvid.com/data3/<hash>/<hash>.m3u8\';
@@ -319,6 +341,13 @@
                 var vurl;
                 try { vurl = new URL(first, m3u8url).toString(); } catch (e) { vurl = first; }
                 return dmGetText(hiProxyX(vurl, referer, origin), 25000, false).then(function (pl2) {
+                  // Google Drive serves datacenter IPs a PNG placeholder
+                  // instead of video bytes — the manifest parses (so the
+                  // player shows a duration) but every segment is an image.
+                  // Treat it as a dead server so the next one is tried.
+                  if (/googleusercontent\.com/i.test(pl2)) {
+                    throw new Error('turbo: segments blocked (drive placeholder)');
+                  }
                   return blobOf(hiRewritePlaylist(pl2, vurl, referer, origin));
                 });
               });
@@ -337,7 +366,11 @@
                 return frames;
               }).then(function (frames) {
                 // Try the most reliable servers first, regardless of page order.
+                // abyssplayer leads: its MP4s are proven to serve through our
+                // proxy (turbonewvid's segments are Google-Drive PNG
+                // placeholders to datacenter IPs — see the Drive guard below).
                 function hostRank(u) {
+                  if (u.indexOf('https://abyssplayer.com/') === 0) return -1;
                   if (u.indexOf('https://turbonewvid.com/') === 0) return 0;
                   if (u.indexOf('https://rubystm.com') === 0) return 1;
                   if (u.indexOf('https://vidmoly.net/') === 0) return 2;
@@ -347,7 +380,8 @@
                 function attempt(i) {
                   if (i >= frames.length) return Promise.reject(new Error('All Hindi servers failed for this episode'));
                   var u = frames[i], job;
-                  if (u.indexOf('https://turbonewvid.com/') === 0) job = hiTurbo(u);
+                  if (u.indexOf('https://abyssplayer.com/') === 0) job = hiAbyss(u);
+                  else if (u.indexOf('https://turbonewvid.com/') === 0) job = hiTurbo(u);
                   else if (u.indexOf('https://rubystm.com') === 0) job = hiRuby(u);
                   else if (u.indexOf('https://vidmoly.net/') === 0) job = hiVidmoly(u);
                   else job = Promise.reject(new Error('unsupported host'));
