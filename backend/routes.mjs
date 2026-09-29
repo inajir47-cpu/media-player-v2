@@ -14,8 +14,6 @@ import {
   invalidateStream,
   unb64url,
   b64url,
-  workerProxyUrl,
-  WORKER_BASE,
 } from './stream.mjs';
 
 const router = Router();
@@ -24,41 +22,6 @@ const UPSTREAM_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 router.get('/health', (_req, res) => res.json({ ok: true, service: 'stream' }));
-
-// GET /api/stream/en/diag — temporary connectivity diagnostics (Render -> worker -> upstream).
-// Optional ?url=<plain https url> probes that URL through the worker too.
-router.get('/en/diag', async (req, res) => {
-  const out = { node: process.version };
-  const timed = async (label, fn) => {
-    const t0 = Date.now();
-    try {
-      out[label] = { ...(await fn()), ms: Date.now() - t0 };
-    } catch (e) {
-      out[label] = { error: String((e && e.message) || e), ms: Date.now() - t0 };
-    }
-  };
-  await timed('workerHealth', async () => {
-    const r = await fetch(`${WORKER_BASE}/health`, { headers: { 'User-Agent': UPSTREAM_UA } });
-    return { status: r.status, body: (await r.text()).slice(0, 120) };
-  });
-  const apiUrl = 'https://reanime.to/api/flix/154587/1';
-  await timed('viaWorker', async () => {
-    const r = await fetch(workerProxyUrl(apiUrl), { headers: { 'User-Agent': UPSTREAM_UA } });
-    return { status: r.status, body: (await r.text()).slice(0, 160) };
-  });
-  await timed('direct', async () => {
-    const r = await fetch(apiUrl, { headers: { 'User-Agent': UPSTREAM_UA, Accept: 'application/json, */*' } });
-    return { status: r.status, body: (await r.text()).slice(0, 120) };
-  });
-  const probe = String(req.query.url || '');
-  if (/^https:\/\//.test(probe)) {
-    await timed('probeViaWorker', async () => {
-      const r = await fetch(workerProxyUrl(probe), { headers: { 'User-Agent': UPSTREAM_UA } });
-      return { status: r.status, body: (await r.text()).slice(0, 160) };
-    });
-  }
-  res.json(out);
-});
 
 // GET /api/stream/en/search?q=
 router.get('/en/search', async (req, res) => {

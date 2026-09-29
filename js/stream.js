@@ -78,12 +78,37 @@
     return 'WEBVTT\n\n' + body;
   }
 
-  /* ---------- English backend API ---------- */
+  /* ---------- English via Cloudflare Worker (browser -> worker -> upstream) ---------- */
+  // reanime.to and flixcloud.cc block datacenter IPs (Render), but the worker's
+  // edge near the user reaches them fine. So English API calls happen here in
+  // the browser through the worker instead of on the backend. (Hindi is untouched.)
+  var WORKER = 'https://mpv2-hls-proxy.gmpdi020.workers.dev';
+  var REANIME = 'https://reanime.to';
+  var FLIX = 'https://flixcloud.cc';
+  function wproxy(url, ref, keyB64url) {
+    var u = WORKER + '/hls?d=' + stB64url(url);
+    if (ref) u += '&ref=' + stB64url(ref);
+    if (keyB64url) u += '&k=' + keyB64url;
+    return u;
+  }
+  function b64ToB64url(b64) {
+    var bin = atob(b64), i, s = '';
+    var bytes = new Uint8Array(bin.length);
+    for (i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    for (i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function wGetJSON(url) {
+    return fetch(wproxy(url)).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  }
   var serversCache = {};
   function enServers(anilistId, ep) {
     var k = anilistId + ':' + ep;
     if (!serversCache[k]) {
-      serversCache[k] = getJSON(API + '/en/servers?anilistId=' + anilistId + '&ep=' + ep)
+      serversCache[k] = wGetJSON(REANIME + '/api/flix/' + anilistId + '/' + ep)
         .then(function (d) { return d.servers || []; }, function () { return []; });
     }
     return serversCache[k];
@@ -93,18 +118,61 @@
   function enReanimeId(anilistId, title) {
     var k = 'a' + anilistId;
     if (!reanimeIdCache[k]) {
-      reanimeIdCache[k] = getJSON(API + '/en/search?q=' + encodeURIComponent(title))
+      reanimeIdCache[k] = wGetJSON(REANIME + '/api/v1/search?q=' + encodeURIComponent(title) + '&limit=12')
         .then(function (d) {
-          var rs = d.results || [], i;
-          for (i = 0; i < rs.length; i++) if (rs[i].anilistId === anilistId) return rs[i].animeId;
-          return rs.length ? rs[0].animeId : null;
+          var rs = d.results || [], i, aid, alid;
+          for (i = 0; i < rs.length; i++) {
+            aid = rs[i].anime_id; alid = rs[i].anilist_id;
+            if (typeof alid === 'number' && alid === anilistId) return aid;
+          }
+          return rs.length ? rs[0].anime_id : null;
         }, function () { return null; });
     }
     return reanimeIdCache[k];
   }
   function enWatch(animeId, anilistId, ep, type) {
-    return getJSON(API + '/en/watch?animeId=' + encodeURIComponent(animeId) +
-      '&anilistId=' + anilistId + '&ep=' + ep + (type ? '&type=' + type : ''));
+    return enServers(anilistId, ep).then(function (servers) {
+      var sorted = (servers || []).slice();
+      if (type === 'sub' || type === 'dub') {
+        sorted.sort(function (a, b) {
+          return ((a.dataType === type) ? 0 : 1) - ((b.dataType === type) ? 0 : 1);
+        });
+      }
+      if (!sorted.length) throw new Error('No servers found for this episode');
+      var lastErr = null;
+      function attempt(i) {
+        if (i >= sorted.length) throw (lastErr || new Error('Stream resolution failed'));
+        var srv = sorted[i];
+        return fetch(wproxy(srv.dataLink, REANIME + '/'))
+          .then(function (r) { if (!r.ok) throw new Error('Embed ' + r.status); return r.text(); })
+          .then(function (html) {
+            return window.MPV2.FlixExtract.extractFlixcloud(html, {
+              apiBase: FLIX,
+              headers: {},
+              referer: REANIME + '/',
+              fetchImpl: function (u, opts) {
+                var ref = (opts && opts.headers && opts.headers.Referer) || (FLIX + '/');
+                return fetch(wproxy(u, ref));
+              }
+            });
+          })
+          .then(function (ex) {
+            if (!ex.url) throw new Error('No stream URL extracted');
+            var keyB64url = ex.playlist_key ? b64ToB64url(ex.playlist_key) : null;
+            // Worker decrypts (?k=), rewrites every URI to itself, serves segments.
+            var streamUrl = wproxy(ex.url, FLIX + '/', keyB64url);
+            var subs = (ex.subtitles || []).map(function (s) {
+              return { url: wproxy(s.url), label: s.language || 'Subtitles', lang: 'en' };
+            });
+            return {
+              serverName: srv.serverName, dataType: srv.dataType,
+              stream: streamUrl, audioTracks: [], subtitles: subs
+            };
+          })
+          .catch(function (e) { lastErr = e; return attempt(i + 1); });
+      }
+      return attempt(0);
+    });
   }
 
   /* ---------- Hindi (ToonStream via the provider) ---------- */
