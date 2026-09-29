@@ -279,7 +279,10 @@
       playUrl(video.dataset.opProvider, video.dataset.opId, video.dataset.opTitle || '')
         .then(function (url) {
           if (!url || !video.isConnected) return; // no video: poster stays
-          try { video.src = url; } catch (e) { return; }
+          try {
+            video.src = url;
+            video.load(); // buffer in the background now — no wait on scroll
+          } catch (e) { return; }
           playMuted(video);
         });
     });

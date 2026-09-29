@@ -351,7 +351,7 @@
         '<div><h2>TOP 010</h2><p class="online-sub">Trending ' + (manga ? 'manga' : 'anime') +
         ' · Source: ' + esc(providerName()) + '</p></div>' +
         '<div class="pill-row" role="tablist" aria-label="Time range">' + pills + '</div>' +
-      '</div><div class="top10-list" id="top10List">' + skeletonRows(5) + '</div></section>';
+      '</div><div class="top10-viewport" id="top10Viewport"><div class="top10-list" id="top10List">' + skeletonRows(5) + '</div></div></section>';
   }
 
   function skeletonRows(n) {
@@ -395,8 +395,76 @@
         ? items.map(rankRow).join('')
         : emptyState('info', 'Nothing here yet', 'Try another range or provider.');
       if (window.MPV2.OPVideos) window.MPV2.OPVideos.wireTop10(list, items);
+      var vp = root.querySelector('#top10Viewport');
+      if (vp) wireTop10Carousel(vp);
       loadReco(root, items[0]);
     }).catch(function (err) { if (list.isConnected) list.innerHTML = errorHtml(err); });
+  }
+
+  /* TOP 010 auto-carousel: desktop/tablet scrolls vertically showing 3 rows,
+   * phones scroll horizontally showing 1 card (2 on wider phones).
+   * Auto-advances like a moving carousel; any manual scroll pauses it for a
+   * while, then it resumes. Rows are never detached, so the opening videos
+   * keep playing in the background and never restart when scrolled back. */
+  function carouselReduced() {
+    try {
+      var s = JSON.parse(localStorage.getItem('mpv2_settings_v1') || '{}');
+      if (s.reduce) return true;
+    } catch (e) {}
+    return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+  function wireTop10Carousel(viewport) {
+    if (!viewport || carouselReduced()) return;
+    if (viewport._t10stop) viewport._t10stop();
+    var list = viewport.querySelector('#top10List');
+    if (!list) return;
+    var GAP = 8, DWELL = 4200, RESUME_AFTER = 12000;
+    var timer = null, resumeT = null;
+    function horizontal() {
+      return !!(window.matchMedia && window.matchMedia('(max-width: 767px)').matches);
+    }
+    function step() {
+      if (!viewport.isConnected || document.hidden) return;
+      var rows = list.children;
+      if (rows.length < 2) return;
+      var r0 = rows[0].getBoundingClientRect();
+      if (horizontal()) {
+        var w = r0.width + GAP;
+        if (!(w > 0)) return;
+        var idx = Math.round(viewport.scrollLeft / w);
+        var next = (idx + 1) % rows.length;
+        viewport.scrollTo({ left: next * w, behavior: 'smooth' });
+      } else {
+        var h = r0.height + GAP;
+        if (!(h > 0)) return;
+        var top = Math.round(viewport.scrollTop / h) * h;
+        var maxTop = viewport.scrollHeight - viewport.clientHeight;
+        if (top + h > maxTop + 1) {
+          viewport.scrollTo({ top: 0, behavior: 'smooth' }); // rewind to start
+        } else {
+          viewport.scrollTo({ top: top + h, behavior: 'smooth' });
+        }
+      }
+    }
+    function start() {
+      stop();
+      timer = setInterval(step, DWELL);
+    }
+    function stop() {
+      if (timer) { clearInterval(timer); timer = null; }
+    }
+    function onUserScroll() {
+      stop();
+      if (resumeT) clearTimeout(resumeT);
+      resumeT = setTimeout(start, RESUME_AFTER);
+    }
+    viewport.addEventListener('wheel', onUserScroll, { passive: true });
+    viewport.addEventListener('touchstart', onUserScroll, { passive: true });
+    viewport._t10stop = function () {
+      stop();
+      if (resumeT) { clearTimeout(resumeT); resumeT = null; }
+    };
+    start();
   }
 
   function errorHtml(err, showDetail) {

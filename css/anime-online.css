@@ -21,6 +21,30 @@
 
 /* TOP 010 ranked rows */
 .top10-list { display: flex; flex-direction: column; gap: 8px; }
+/* TOP 010 auto-carousel viewport: desktop/tablet show 3 rows and scroll
+   vertically; phones show 1 card (2 on wider phones) and scroll
+   horizontally. Scrollbars hidden — wheel / touch / drag still scroll. */
+.top10-viewport { scrollbar-width: none; }
+.top10-viewport::-webkit-scrollbar { display: none; }
+@media (min-width: 768px) {
+  .top10-viewport {
+    max-height: 300px; /* ~3 rows */
+    overflow-y: auto; overflow-x: hidden;
+    scroll-snap-type: y proximity;
+    padding-right: 2px;
+  }
+  .top10-viewport .top10-row { scroll-snap-align: start; }
+}
+@media (max-width: 767px) {
+  .top10-viewport { overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; }
+  .top10-viewport .top10-list { flex-direction: row; align-items: stretch; }
+  .top10-viewport .top10-row { flex: 0 0 100%; scroll-snap-align: start; }
+  .top10-viewport .top10-row:hover { transform: none; }
+}
+@media (min-width: 600px) and (max-width: 767px) {
+  /* wider phones / small tablets in portrait: fit 2 cards */
+  .top10-viewport .top10-row { flex-basis: calc(50% - 4px); }
+}
 .top10-row { display: flex; align-items: center; gap: 14px; padding: 10px 14px 10px 6px;
   border-radius: 18px; background: rgba(255,255,255,.035);
   border: 1px solid rgba(255,255,255,.07); text-decoration: none; color: inherit;
