@@ -96,7 +96,7 @@
           (rv.avatar ? '<img class="rv-avatar" src="' + esc(rv.avatar) + '" alt="" loading="lazy">' :
                        '<span class="rv-avatar rv-avatar-fb">' + esc((rv.user || '?').charAt(0).toUpperCase()) + '</span>') +
           '<div class="rv-who"><b>' + esc(rv.user) + '</b>' +
-            '<span>' + (rv.score != null ? '★ ' + esc(String(rv.score)) + ' · ' : '') + esc(date) + '</span></div>' +
+            '<span>' + esc(date) + (rv.score != null ? ' · ★ ' + esc(String(rv.score)) : '') + '</span></div>' +
         '</div>' +
         (rv.summary ? '<div class="rv-summary">' + esc(rv.summary) + '</div>' : '') +
         '<div class="rv-text"><p class="rv-p">' + shown + '</p>' +
@@ -622,7 +622,7 @@
         '<div class="pill-row" aria-label="Sort">' + sorts + '</div></div>' +
       '<div class="chip-row" aria-label="Genres">' + chips + '</div>' +
       '<div class="poster-grid online-grid" id="genreGrid">' + skeletonCards(6) + '</div>' +
-      '<div class="load-more-wrap"><button class="load-more hidden" id="loadMore">Load more</button></div>' +
+      '<div class="load-more-wrap"><div class="infinite-sentinel" id="genreSentinel" aria-hidden="true"></div></div>' +
       '</section>';
   }
 
@@ -635,10 +635,14 @@
 
   function loadGenre(root, append) {
     var grid = root.querySelector('#genreGrid');
-    var more = root.querySelector('#loadMore');
+    var sentinel = root.querySelector('#genreSentinel');
+    if (state.loading) return;
     if (!append) grid.innerHTML = skeletonCards(6);
-    more.classList.add('hidden');
+    state.loading = true;
+    if (sentinel) sentinel.classList.add('loading');
     API().byGenre(state.genre, state.page, state.sort, state.type).then(function (res) {
+      state.loading = false;
+      if (sentinel) sentinel.classList.remove('loading');
       if (!grid.isConnected) return;
       if (!append) state.items = [];
       state.items = state.items.concat(res.items);
@@ -646,8 +650,9 @@
       grid.innerHTML = state.items.length
         ? state.items.map(onlineCard).join('')
         : emptyState('info', 'No titles found', 'Try another genre or provider.');
-      more.classList.toggle('hidden', !state.hasMore);
     }).catch(function (err) {
+      state.loading = false;
+      if (sentinel) sentinel.classList.remove('loading');
       if (!grid.isConnected) return;
       if (!append) grid.innerHTML = errorHtml(err);
     });
@@ -676,7 +681,7 @@
   function resetDiscoverState(type) {
     state = { type: type === 'MANGA' ? 'MANGA' : 'ANIME',
               range: 'today', genre: 'Action', sort: 'popularity',
-              page: 1, items: [], hasMore: false };
+              page: 1, items: [], hasMore: false, loading: false };
   }
 
   window.MPV2.discoverBlockHtml = function (sec) {
@@ -793,16 +798,23 @@
         loadGenre(root, false);
         return;
       }
-      if (e.target.closest('#loadMore')) {
-        state.page += 1;
-        loadGenre(root, true);
-        return;
-      }
       if (e.target.closest('[data-retry]')) {
         loadTop10(root);
         loadGenre(root, false);
       }
     });
+    // Infinite scroll: auto-fetch the next page when the sentinel scrolls
+    // into view (600px before it, so there's no visible gap).
+    var sentinel = root.querySelector('#genreSentinel');
+    if (sentinel && 'IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function (entries) {
+        if (entries[0] && entries[0].isIntersecting && state.hasMore && !state.loading) {
+          state.page += 1;
+          loadGenre(root, true);
+        }
+      }, { rootMargin: '600px 0px' });
+      io.observe(sentinel);
+    }
   }
 
   // Shared with the app's default Search tab.
@@ -1117,7 +1129,9 @@
           studios +
           '<div class="genre-tags">' + (d.genres || []).map(function (g) {
             return '<span class="genre-tag">' + esc(g) + '</span>';
-          }).join('') + '</div>' + trailer + watchOrder + coming + '</div></header>' +
+          }).join('') + '</div>' + (trailer || watchOrder
+            ? '<div class="detail-actions">' + trailer + watchOrder + '</div>' : '') +
+          coming + '</div></header>' +
         '<section class="online-block"><h2>Synopsis</h2><p class="synopsis">' +
           esc(d.synopsis || 'No synopsis available.') + '</p></section>' +
         epListPlaceholder(d, isManga) +
@@ -1247,6 +1261,7 @@
       (thumb ? '<img src="' + esc(thumb) + '" alt="" loading="lazy">' :
         '<span class="episode-card-num">' + esc(String(it.n)) + '</span>') +
       '<span class="episode-number">' + esc(num) + '</span>' +
+      '<span class="ep-watched-badge">' + icon('check') + '<b>Watched</b></span>' +
       (soon ? '<span class="ep-soon">SOON</span>' : '') +
       (pct ? '<span class="ep-progress"><span style="width:' + pct + '%"></span></span>' : '') +
       '<span class="episode-actions">' +
@@ -1291,6 +1306,49 @@
       card.classList.toggle('watched', on);
       setEpWatched(b.getAttribute('data-ep-watched'), on);
     });
+    // Keep episode states fresh: when the player saves progress (mpv2:history),
+    // update watched badges + progress bars in place so returning from the
+    // player instantly shows the new state — no re-render, no lost scroll.
+    function refreshEpStates() {
+      if (isCh || !hkey) return;
+      var W = window.MPV2 && window.MPV2.Watch;
+      var pm = null;
+      try { pm = W ? W.getEpProgress(hkey) : null; } catch (e) { pm = null; }
+      var w = epWatched();
+      strip.querySelectorAll('.episode-card[data-ep-n]').forEach(function (card) {
+        var n = parseInt(card.getAttribute('data-ep-n'), 10);
+        if (!(n > 0)) return;
+        var btn = card.querySelector('[data-ep-watched]');
+        var key = btn ? btn.getAttribute('data-ep-watched') : null;
+        var prog = pm ? pm[n] : null;
+        var done = (key && !!w[key]) || !!(prog && prog.done);
+        card.classList.toggle('watched', done);
+        var pct = 0;
+        if (!done && prog && prog.d > 0 && prog.p > 5) {
+          pct = Math.max(2, Math.min(100, Math.round((prog.p / prog.d) * 100)));
+        }
+        var bar = card.querySelector('.ep-progress');
+        if (pct > 0) {
+          if (!bar) {
+            bar = document.createElement('span');
+            bar.className = 'ep-progress';
+            bar.innerHTML = '<span></span>';
+            card.appendChild(bar);
+          }
+          bar.firstChild.style.width = pct + '%';
+        } else if (bar) {
+          bar.remove();
+        }
+      });
+    }
+    function onHistory() {
+      if (!document.contains(block)) {
+        document.removeEventListener('mpv2:history', onHistory);
+        return;
+      }
+      refreshEpStates();
+    }
+    document.addEventListener('mpv2:history', onHistory);
     // Movie block: single static row, already in the HTML — no pagination.
     if (block.hasAttribute('data-ep-movie')) { block.hidden = false; return; }
     var strip = block.querySelector('[data-' + kind + '-grid]');

@@ -86,6 +86,13 @@
   color: inherit; font-size: 14px; font-weight: 700; padding: 12px 34px; border-radius: 999px;
   cursor: pointer; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
 .load-more.hidden { display: none; }
+/* Infinite scroll sentinel: invisible trigger + spinner while auto-fetching. */
+.infinite-sentinel { min-height: 8px; display: flex; align-items: center; justify-content: center; }
+.infinite-sentinel.loading { min-height: 64px; }
+.infinite-sentinel.loading::after { content: ""; width: 30px; height: 30px; border-radius: 50%;
+  border: 3px solid rgba(255,255,255,.18); border-top-color: #fff;
+  animation: inf-spin .8s linear infinite; }
+@keyframes inf-spin { to { transform: rotate(360deg); } }
 
 /* error + retry */
 .online-error { text-align: center; padding: 34px 18px; border-radius: 20px;
@@ -193,13 +200,15 @@
 .genre-tag { font-size: 11.5px; font-weight: 600; padding: 5px 11px; border-radius: 999px;
   background: color-mix(in srgb, var(--tone) 16%, transparent);
   border: 1px solid color-mix(in srgb, var(--tone) 40%, transparent); }
-.trailer-btn { display: inline-flex; align-items: center; gap: 8px; margin-top: 4px;
+.trailer-btn { display: inline-flex; align-items: center; gap: 8px;
   background: var(--tone); color: #fff; text-decoration: none; font-weight: 700; font-size: 14px;
   padding: 10px 22px; border-radius: 999px;
   box-shadow: 0 6px 22px color-mix(in srgb, var(--tone) 50%, transparent); }
 .trailer-btn .icon { width: 18px; height: 18px; }
 button.trailer-btn { border: 0; cursor: pointer; font-family: inherit; }
-.wo-btn { margin-left: 8px; }
+/* Action buttons (Trailer / Watch Order) sit in their own row with clean
+   separation from the poster — never crowding it on narrow screens. */
+.detail-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 
 /* Watch history: Play + Save-to-Watchlist row on the detail page */
 .wh-row { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
@@ -285,7 +294,7 @@ button.trailer-btn { border: 0; cursor: pointer; font-family: inherit; }
 /* character page: AniList spoiler markup */
 .spoiler { background: rgba(255,255,255,.16); border-radius: 6px; padding: 1px 6px; }
 .cast-va-photo { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; background: #1a1a1d;
-  border: 1px solid rgba(255,255,255,.14); }
+  border: 1px solid rgba(255,255,255,.14); flex: none; }
 
 /* settings: provider note */
 .provider-note { font-size: 12.5px; color: var(--muted, #8e8e93); line-height: 1.55; margin: 10px 0 0; }
@@ -418,6 +427,18 @@ button.trailer-btn { border: 0; cursor: pointer; font-family: inherit; }
   display: block; height: 100%; width: 0;
   background: var(--tone, #f97316);
 }
+/* Watched episodes: fade the artwork and show a checkmark badge so
+ * completed episodes are instantly recognizable. */
+.episode-card.watched > img,
+.episode-card.watched .episode-card-num { opacity: .38;
+  filter: saturate(.35) brightness(.65); }
+.episode-card.watched .episode-open { opacity: .55; }
+.ep-watched-badge { display: none; position: absolute; top: 44px; left: 10px; z-index: 5;
+  align-items: center; gap: 5px; font-size: 10.5px; font-weight: 800; letter-spacing: .04em;
+  color: #fff; background: rgba(22, 120, 62, .88); border: 1px solid rgba(255,255,255,.25);
+  padding: 4px 10px; border-radius: 999px; }
+.ep-watched-badge .icon { width: 12px; height: 12px; }
+.episode-card.watched .ep-watched-badge { display: inline-flex; }
 
 /* ---------- Opening-theme video previews ---------- */
 .poster-img .op-preview {
@@ -584,7 +605,8 @@ button.trailer-btn { border: 0; cursor: pointer; font-family: inherit; }
 .rv-who b { font-size: 13px; color: #fff; }
 .rv-who span { font-size: 11px; color: rgba(255,255,255,.5); }
 .rv-summary { font-size: 13px; font-weight: 700; color: #fff; }
-.rv-text { font-size: 13px; line-height: 1.55; color: rgba(255,255,255,.78); }
+.rv-text { font-size: 13px; line-height: 1.55; color: rgba(255,255,255,.78);
+  overflow-wrap: anywhere; word-break: break-word; }
 .rv-p { margin: 0 0 8px; } .rv-p:last-child { margin-bottom: 0; }
 .rv-text a { color: #93c5fd; }
 .rv-more { align-self: flex-start; font: inherit; font-size: 12px; font-weight: 700;
@@ -602,7 +624,28 @@ button.trailer-btn { border: 0; cursor: pointer; font-family: inherit; }
 .ch-pop-hero .poster-img.big { width: 92px; flex: none; }
 .ch-pop-name { margin: 0; font-size: 22px; font-weight: 800; color: #fff; }
 .ch-pop-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.ch-pop-item { display: flex; flex-direction: column; gap: 4px; }
+.ch-pop-item { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .ch-pop-item img { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 10px; }
 .ch-pop-item span { font-size: 11px; color: rgba(255,255,255,.65);
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  overflow-wrap: anywhere; }
+
+/* ---------- light (day) mode: remap hardcoded white text to theme tokens ----------
+   Several rules above hardcode #fff / rgba(255,255,255,…) for the OLED dark theme;
+   in light mode those become invisible. Dark mode is untouched. */
+:root[data-theme="light"] .synopsis { color: var(--text); }
+:root[data-theme="light"] .rv-sec,
+:root[data-theme="light"] .rv-who b,
+:root[data-theme="light"] .rv-summary,
+:root[data-theme="light"] .ch-pop-name { color: var(--text); }
+:root[data-theme="light"] .rv-text { color: var(--text); }
+:root[data-theme="light"] .rv-score-sub,
+:root[data-theme="light"] .rv-bar-score,
+:root[data-theme="light"] .rv-bar-n,
+:root[data-theme="light"] .rv-who span,
+:root[data-theme="light"] .rv-empty,
+:root[data-theme="light"] .rv-loading,
+:root[data-theme="light"] .ch-pop-item span { color: var(--muted); }
+:root[data-theme="light"] .rv-card { background: rgba(23,23,21,.045);
+  border-color: rgba(23,23,21,.12); }
+:root[data-theme="light"] .rv-avatar-fb { color: #fff; }

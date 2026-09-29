@@ -358,7 +358,7 @@
   color:var(--poster, var(--tone)); margin:22px 0 12px}
 .cast-heading:first-of-type{margin-top:4px}
 .cast-list{display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:12px}
-.cast-card{width:100%; min-width:0; display:grid; grid-template-columns:74px minmax(0,1fr) 30px;
+.cast-card{width:100%; min-width:0; display:grid; grid-template-columns:74px minmax(0,1fr) auto;
   align-items:center; gap:13px; padding:9px; border:1px solid var(--line); border-radius:16px;
   background:var(--surface); text-align:left; cursor:pointer; color:inherit; font:inherit;
   transition:transform .24s cubic-bezier(.22,1,.36,1), border-color .2s ease, box-shadow .24s ease}

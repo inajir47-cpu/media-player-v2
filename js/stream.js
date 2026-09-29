@@ -342,7 +342,8 @@
     if (!Number.isFinite(anilistId)) anilistId = null;
     var ctx = { anilistId: anilistId, title: d.title || '', poster: d.image || '',
                 provider: prov, pid: String(id != null ? id : (d.id != null ? d.id : '')),
-                isMovie: !isManga && String(d.format || '').toUpperCase() === 'MOVIE' };
+                isMovie: !isManga && String(d.format || '').toUpperCase() === 'MOVIE',
+                episodes: parseInt(d.episodes, 10) || 0 };
     if (!ctx.anilistId && !ctx.title) return;
     Array.prototype.forEach.call(mount.querySelectorAll('[data-ep-grid]'), function (grid) {
       Array.prototype.forEach.call(
@@ -722,7 +723,124 @@
       resolve().then(function (s) { attachStream(shell, s, lang, track); },
         function (err) { playerFail(shell, err && err.message ? err.message : 'Could not load this stream'); });
     });
+    // Episode navigation: jump straight to the adjacent episode with the
+    // same provider + language (no dialog in between).
+    function goEp(nn) {
+      if (ctx.isMovie) return;
+      if (nn < 1) return;
+      if (ctx.episodes && nn > ctx.episodes) return;
+      startWatch(ctx, nn, prov, lang);
+    }
+    var prevBtn = shell.querySelector('.st-p-prev');
+    var nextBtn = shell.querySelector('.st-p-next');
+    if (prevBtn) {
+      if (n <= 1) prevBtn.disabled = true;
+      prevBtn.addEventListener('click', function () { goEp(n - 1); });
+    }
+    if (nextBtn) {
+      if (ctx.episodes && n >= ctx.episodes) nextBtn.disabled = true;
+      nextBtn.addEventListener('click', function () { goEp(n + 1); });
+    }
     return function () { done = true; };
+  }
+
+  /* ---------- player touch gestures ----------
+   * Double-tap left/right: seek -10s/+10s · double-tap center: play/pause.
+   * Vertical swipe on left half: brightness · right half: volume.
+   * Pinch out/in: toggle fill (cover) / fit (contain).
+   * Listeners are passive so native <video> controls keep working. */
+  function wireGestures(shell, video) {
+    var ind = shell.querySelector('.st-gesture-ind');
+    var indT = null;
+    function show(html) {
+      if (!ind) return;
+      ind.innerHTML = html;
+      ind.classList.add('on');
+      clearTimeout(indT);
+      indT = setTimeout(function () { ind.classList.remove('on'); }, 750);
+    }
+    function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+    var bright = 1;
+    var t1 = null;          // single-touch tracking
+    var lastTap = 0;        // double-tap detection
+    var pinchD0 = 0;        // pinch start distance
+    var filled = false;     // object-fit: cover?
+    function tdist(a, b) {
+      var dx = a.clientX - b.clientX, dy = a.clientY - b.clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+    video.addEventListener('touchstart', function (e) {
+      if (e.touches.length === 2) {
+        pinchD0 = tdist(e.touches[0], e.touches[1]);
+        t1 = null;
+      } else if (e.touches.length === 1) {
+        var t = e.touches[0];
+        t1 = { x0: t.clientX, y0: t.clientY, lx: t.clientX, ly: t.clientY,
+               t0: Date.now(), vMode: null, startVal: 0 };
+      }
+    }, { passive: true });
+    video.addEventListener('touchmove', function (e) {
+      if (e.touches.length === 2 && pinchD0 > 0) {
+        var d = tdist(e.touches[0], e.touches[1]);
+        var ratio = d / pinchD0;
+        if (!filled && ratio > 1.35) {
+          filled = true; video.style.objectFit = 'cover';
+          pinchD0 = d; show('Fill');
+        } else if (filled && ratio < 0.7) {
+          filled = false; video.style.objectFit = 'contain';
+          pinchD0 = d; show('Fit');
+        }
+        return;
+      }
+      if (!t1 || e.touches.length !== 1) return;
+      var t = e.touches[0];
+      t1.lx = t.clientX; t1.ly = t.clientY;
+      var dy = t.clientY - t1.y0, dx = t.clientX - t1.x0;
+      if (!t1.vMode && Math.abs(dy) > 24 && Math.abs(dy) > Math.abs(dx) * 1.4) {
+        t1.vMode = t1.x0 < window.innerWidth / 2 ? 'bright' : 'vol';
+        t1.startVal = t1.vMode === 'bright' ? bright : video.volume;
+      }
+      if (t1.vMode) {
+        var delta = (t1.y0 - t.clientY) / 220; // swipe up = increase
+        if (t1.vMode === 'bright') {
+          bright = clamp(t1.startVal + delta, 0.35, 1.6);
+          video.style.filter = bright === 1 ? '' : 'brightness(' + bright.toFixed(2) + ')';
+          show('Brightness ' + Math.round(bright * 100) + '%');
+        } else {
+          var v = clamp(t1.startVal + delta, 0, 1);
+          try { video.volume = v; } catch (err) {}
+          if (v > 0 && video.muted) { try { video.muted = false; } catch (err2) {} }
+          show('Volume ' + Math.round(v * 100) + '%');
+        }
+      }
+    }, { passive: true });
+    video.addEventListener('touchend', function (e) {
+      if (pinchD0 > 0 && e.touches.length < 2) pinchD0 = 0;
+      if (!t1 || e.touches.length !== 0) return;
+      var dt = Date.now() - t1.t0;
+      var moved = Math.abs(t1.lx - t1.x0) > 12 || Math.abs(t1.ly - t1.y0) > 12;
+      var x = t1.x0;
+      t1 = null;
+      if (moved || dt > 350) return;
+      // quick tap: second tap within 350ms = double-tap
+      var now = Date.now();
+      if (now - lastTap < 350) {
+        lastTap = 0;
+        var w = window.innerWidth;
+        try {
+          if (x < w * 0.35) {
+            video.currentTime = Math.max(0, video.currentTime - 10);
+            show('<b>&minus;10s</b>');
+          } else if (x > w * 0.65) {
+            var dur = video.duration || Infinity;
+            video.currentTime = Math.min(dur, video.currentTime + 10);
+            show('<b>+10s</b>');
+          } else if (video.paused) { video.play(); } else { video.pause(); }
+        } catch (err) {}
+      } else {
+        lastTap = now;
+      }
+    }, { passive: true });
   }
 
   function openPlayerShell(ctx, n, provName, lang) {
@@ -734,10 +852,14 @@
         '<button class="st-p-btn st-p-back" type="button" aria-label="Back">' + icon('x') + '</button>' +
         '<div class="st-p-title"><b>' + esc(ctx.title || 'Episode ' + n) + '</b>' +
           '<i>EP ' + n + ' · ' + esc(provName) + ' · ' + esc(lang) + '</i></div>' +
+        (ctx.isMovie ? '' :
+          '<button class="st-p-btn st-p-prev" type="button" aria-label="Previous episode">' + icon('arrowLeft') + '</button>' +
+          '<button class="st-p-btn st-p-next" type="button" aria-label="Next episode">' + icon('arrowRight') + '</button>') +
         '<button class="st-p-btn st-p-audio hidden" type="button" aria-label="Audio track">Native</button>' +
         '<button class="st-p-btn st-p-subs hidden" type="button" aria-label="Subtitles">Subs</button>' +
       '</div>' +
       '<video class="st-p-video" controls playsinline preload="auto"></video>' +
+      '<div class="st-gesture-ind" aria-hidden="true"></div>' +
       '<div class="st-p-loading"><span class="st-p-spin"></span><i>Loading stream…</i></div>' +
       '<div class="st-p-error hidden"><b>Stream failed</b><p></p>' +
         '<button class="st-p-retry" type="button">Retry</button></div>' +
@@ -772,6 +894,7 @@
     var video = shell.querySelector('.st-p-video');
     shell.querySelector('.st-p-loading').classList.add('hidden');
     wireHistoryTrack(video, shell, track);
+    wireGestures(shell, video);
     // subtitles (proxied urls from the backend; srt -> vtt conversion)
     (s.subtitles || []).forEach(function (sub) {
       fetch(sub.url).then(function (r) {
