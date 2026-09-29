@@ -41,6 +41,13 @@ Obey this on every update. Updated 2026-09-30.
    push, Imran tests on phone.
 4. **A source dies completely**: **remove the provider button** — standing rule, no fake buttons.
    Tell Imran plainly what died.
+9. **Stream CDN returns "Invalid signature" / endless loading** (happened with Hindi-2's
+   JuicyCodes CDN on 2026-09-30): the CDN binds stream signatures to the IP that loaded the
+   embed page. The worker fetches the embed page over IPv6 but the stream host was IPv4-only,
+   so the worker could never present the same IP. Fix: resolve + proxy the stream from the
+   **backend** (one stable IPv4 egress for embed page, playlists and segments). Proven
+   pattern: `/api/stream/hi2/pl` + `/api/stream/hi2/v` (commit `c7566e4`). Discovery
+   (search/episodes) can stay on the phone via the worker; only the fileId crosses over.
 5. **GitHub push blocked / auth failed**: the PAT expired. Ask Imran for a **fresh** PAT.
    Never reuse or store an old one.
 6. **Render deploy fails**: check the Render dashboard deploy logs; hit manual redeploy if needed.
