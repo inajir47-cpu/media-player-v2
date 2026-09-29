@@ -126,7 +126,6 @@
     moon: '<path d="M20 13.5A8 8 0 0 1 10.5 4 8 8 0 1 0 20 13.5z"/>',
     sliders: '<path d="M4 8h10M18 8h2M4 16h4M12 16h8"/><circle cx="16" cy="8" r="2"/><circle cx="10" cy="16" r="2"/>',
     bell: '<path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/>',
-    check: '<path d="M4 12.5l5 5L20 6.5"/>',
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.1"/>'
   };
   function icon(name, cls) {

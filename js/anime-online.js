@@ -1261,7 +1261,6 @@
       (thumb ? '<img src="' + esc(thumb) + '" alt="" loading="lazy">' :
         '<span class="episode-card-num">' + esc(String(it.n)) + '</span>') +
       '<span class="episode-number">' + esc(num) + '</span>' +
-      '<span class="ep-watched-badge">' + icon('check') + '<b>Watched</b></span>' +
       (soon ? '<span class="ep-soon">SOON</span>' : '') +
       (pct ? '<span class="ep-progress"><span style="width:' + pct + '%"></span></span>' : '') +
       '<span class="episode-actions">' +

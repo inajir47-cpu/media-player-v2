@@ -433,12 +433,6 @@ button.trailer-btn { border: 0; cursor: pointer; font-family: inherit; }
 .episode-card.watched .episode-card-num { opacity: .38;
   filter: saturate(.35) brightness(.65); }
 .episode-card.watched .episode-open { opacity: .55; }
-.ep-watched-badge { display: none; position: absolute; top: 44px; left: 10px; z-index: 5;
-  align-items: center; gap: 5px; font-size: 10.5px; font-weight: 800; letter-spacing: .04em;
-  color: #fff; background: rgba(22, 120, 62, .88); border: 1px solid rgba(255,255,255,.25);
-  padding: 4px 10px; border-radius: 999px; }
-.ep-watched-badge .icon { width: 12px; height: 12px; }
-.episode-card.watched .ep-watched-badge { display: inline-flex; }
 
 /* ---------- Opening-theme video previews ---------- */
 .poster-img .op-preview {
