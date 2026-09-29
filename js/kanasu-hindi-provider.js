@@ -22,6 +22,21 @@
               if (origin) p += '&xorigin=' + encodeURIComponent(origin);
               return p;
             }
+            // Cloudflare worker proxy: rubystm/vidmoly 403 Render's datacenter
+            // IPs but answer the worker's edge. The worker rewrites m3u8
+            // playlists to itself, so worker-fetched playlists must NOT be
+            // re-rewritten by hiRewritePlaylist (see hiResolveHls).
+            var HI_WORKER = 'https://mpv2-hls-proxy.gmpdi020.workers.dev';
+            function hiB64url(s) {
+              return btoa(unescape(encodeURIComponent(s)))
+                .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+            }
+            function hiProxyW(u, referer) {
+              if (!dmIsApp()) return u;
+              var p = HI_WORKER + '/hls?d=' + hiB64url(u);
+              if (referer) p += '&ref=' + hiB64url(referer);
+              return p;
+            }
             function hiPost(url, body, contentType, timeoutMs) {
               return new Promise(function (resolve, reject) {
                 var done = false, xhr = new XMLHttpRequest();
@@ -256,21 +271,24 @@
               var segs = embedUrl.replace('.html', '').split('/');
               var code = segs.pop() || segs.pop();
               var body = 'op=embed&file_code=' + encodeURIComponent(code) + '&auto=1&referer=' + encodeURIComponent(TOON + '/');
-              return hiPost(hiProxyX('https://rubystm.com/dl', embedUrl, null), body,
+              // rubystm.com 403s Render's datacenter IPs; the Cloudflare
+              // worker's edge reaches it. Worker v2+ forwards the POST.
+              return hiPost(hiProxyW('https://rubystm.com/dl', embedUrl), body,
                 'application/x-www-form-urlencoded; charset=UTF-8', 20000).then(function (t) {
                 var m = hiUnpackM3u8(t);
                 if (!m) throw new Error('rubystm: no stream');
-                return { url: m, type: 'hls', referer: embedUrl, origin: 'https://rubystm.com' };
+                return { url: m, type: 'hls', referer: embedUrl, origin: 'https://rubystm.com', viaWorker: true };
               });
             }
             function hiVidmoly(embedUrl) {
               // VidMoly embed page carries the m3u8 in plain text:
               //   sources: [{ file: 'https://.../master.m3u8?...' }]
-              return dmGetText(hiProxyX(embedUrl, TOON + '/', null), 20000, false).then(function (html) {
+              // Render is 403-blocked; fetch via the worker.
+              return dmGetText(hiProxyW(embedUrl, TOON + '/'), 20000, false).then(function (html) {
                 var m = String(html).match(/sources\s*:\s*\[\{\s*file\s*:\s*['"](https?:\/\/[^'"]+\.m3u8[^'"]*)['"]/i)
                   || String(html).match(/['"](https?:\/\/[^'"]+\.m3u8[^'"]*)['"]/i);
                 if (!m) throw new Error('vidmoly: no stream');
-                return { url: m[1], type: 'hls', referer: embedUrl, origin: 'https://vidmoly.net' };
+                return { url: m[1], type: 'hls', referer: embedUrl, origin: 'https://vidmoly.net', viaWorker: true };
               });
             }
             function hiAbyss(embedUrl) {
@@ -320,13 +338,19 @@
                 return px(abs(t));
               }).join('\n');
             }
-            function hiResolveHls(m3u8url, referer, origin) {
+            function hiResolveHls(m3u8url, referer, origin, viaWorker) {
               function blobOf(text) {
                 var blob = new Blob([text], { type: 'application/x-mpegURL' });
                 return URL.createObjectURL(blob);
               }
-              return dmGetText(hiProxyX(m3u8url, referer, origin), 25000, false).then(function (pl) {
-                if (!/#EXT-X-STREAM-INF/i.test(pl)) return blobOf(hiRewritePlaylist(pl, m3u8url, referer, origin));
+              // Playlists fetched through the worker are already rewritten to
+              // worker URLs — never re-rewrite them (double proxy breaks).
+              function noRewrite(pl) { return /workers\.dev\/hls\?d=/i.test(pl); }
+              var fetchPl = viaWorker ? m3u8url : hiProxyX(m3u8url, referer, origin);
+              return dmGetText(fetchPl, 25000, false).then(function (pl) {
+                if (!/#EXT-X-STREAM-INF/i.test(pl)) {
+                  return blobOf(noRewrite(pl) ? pl : hiRewritePlaylist(pl, m3u8url, referer, origin));
+                }
                 var lines = pl.split('\n'), first = null;
                 for (var i = 0; i < lines.length; i++) {
                   if (/^#EXT-X-STREAM-INF/i.test(lines[i].trim())) {
@@ -339,8 +363,9 @@
                 }
                 if (!first) throw new Error('No variant stream found');
                 var vurl;
-                try { vurl = new URL(first, m3u8url).toString(); } catch (e) { vurl = first; }
-                return dmGetText(hiProxyX(vurl, referer, origin), 25000, false).then(function (pl2) {
+                if (viaWorker) { vurl = first; }
+                else { try { vurl = new URL(first, m3u8url).toString(); } catch (e) { vurl = first; } }
+                return dmGetText(viaWorker ? vurl : hiProxyX(vurl, referer, origin), 25000, false).then(function (pl2) {
                   // Google Drive serves datacenter IPs a PNG placeholder
                   // instead of video bytes — the manifest parses (so the
                   // player shows a duration) but every segment is an image.
@@ -348,7 +373,7 @@
                   if (/googleusercontent\.com/i.test(pl2)) {
                     throw new Error('turbo: segments blocked (drive placeholder)');
                   }
-                  return blobOf(hiRewritePlaylist(pl2, vurl, referer, origin));
+                  return blobOf(noRewrite(pl2) ? pl2 : hiRewritePlaylist(pl2, vurl, referer, origin));
                 });
               });
             }
@@ -366,14 +391,14 @@
                 return frames;
               }).then(function (frames) {
                 // Try the most reliable servers first, regardless of page order.
-                // abyssplayer leads: its MP4s are proven to serve through our
-                // proxy (turbonewvid's segments are Google-Drive PNG
-                // placeholders to datacenter IPs — see the Drive guard below).
+                // rubystm leads via the Cloudflare worker (it 403s Render's
+                // datacenter IPs). abyssplayer is last: its sssrr.org CDN is
+                // serving truncated files (verified 2026-09-30).
                 function hostRank(u) {
-                  if (u.indexOf('https://abyssplayer.com/') === 0) return -1;
-                  if (u.indexOf('https://turbonewvid.com/') === 0) return 0;
-                  if (u.indexOf('https://rubystm.com') === 0) return 1;
-                  if (u.indexOf('https://vidmoly.net/') === 0) return 2;
+                  if (u.indexOf('https://rubystm.com') === 0) return -1;
+                  if (u.indexOf('https://vidmoly.net/') === 0) return 0;
+                  if (u.indexOf('https://turbonewvid.com/') === 0) return 1;
+                  if (u.indexOf('https://abyssplayer.com/') === 0) return 2;
                   return 3;
                 }
                 frames.sort(function (a, b) { return hostRank(a) - hostRank(b); });
@@ -395,7 +420,7 @@
                 return attempt(0);
               }).then(function (src) {
                 if (src.type === 'hls') {
-                  return hiResolveHls(src.url, src.referer, src.origin).then(function (blobUrl) {
+                  return hiResolveHls(src.url, src.referer, src.origin, src.viaWorker).then(function (blobUrl) {
                     return { stream: blobUrl, subtitles: [], audioTracks: [],
                       animeId: 'hindi:' + slug, ep: ep, _direct: true, _playlistKey: null };
                   });

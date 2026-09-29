@@ -69,7 +69,7 @@ function xorDecryptPlaylist(b64Text, keyBytes) {
 function corsHeaders(extra) {
   return Object.assign({
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, HEAD, POST, OPTIONS',
     'Access-Control-Allow-Headers': '*',
     'Access-Control-Max-Age': '86400',
   }, extra || {});
@@ -114,6 +114,16 @@ async function handleProxy(request, target) {
   // Pass through Range for seeking
   const range = request.headers.get('Range');
   if (range) headers['Range'] = range;
+  // Forward non-GET methods (e.g. RubySTM's POST /dl) with body + content type.
+  const method = (request.method || 'GET').toUpperCase();
+  let body = undefined;
+  if (method === 'POST' || method === 'PUT' || method === 'PATCH') {
+    try { body = await request.arrayBuffer(); } catch (e) { body = undefined; }
+    const ct = request.headers.get('Content-Type');
+    if (ct) headers['Content-Type'] = ct;
+    const xrw = request.headers.get('X-Requested-With');
+    if (xrw) headers['X-Requested-With'] = xrw;
+  }
   // Optional Referer passthrough: &ref=<b64url-of-referer>
   try {
     const refParam = new URL(request.url).searchParams.get('ref');
@@ -125,7 +135,7 @@ async function handleProxy(request, target) {
 
   let upstream;
   try {
-    upstream = await fetch(target, { headers, redirect: 'follow' });
+    upstream = await fetch(target, { headers, redirect: 'follow', method, body });
   } catch (e) {
     return new Response('Upstream fetch failed: ' + e.message, { status: 502, headers: corsHeaders() });
   }
