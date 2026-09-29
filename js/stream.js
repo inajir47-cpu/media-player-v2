@@ -259,7 +259,7 @@
   }
   // Staged: paints EN badges as soon as ready, re-paints when Hindi resolves.
   function checkEpisodeStaged(ctx, n, cb) {
-    var avail = { sub: false, dub: false, hindi: false, hindi2: false, hindi3: false, zanime: false, servers: [] };
+    var avail = { sub: false, dub: false, hindi: false, hindi2: false, zanime: false, servers: [] };
     var jobs = [];
     if (ctx.anilistId) {
       jobs.push(enServers(ctx.anilistId, n).then(function (ss) {
@@ -284,12 +284,6 @@
     if (ctx.title && typeof window.cdHasEpisode === 'function') {
       jobs.push(window.cdHasEpisode(ctx.title, n).then(function (h) {
         avail.hindi2 = !!h;
-        cb(avail);
-      }, function () { cb(avail); }));
-    }
-    if (ctx.title && typeof window.h3HasEpisode === 'function') {
-      jobs.push(window.h3HasEpisode(ctx.title, n).then(function (h) {
-        avail.hindi3 = !!h;
         cb(avail);
       }, function () { cb(avail); }));
     }
@@ -544,21 +538,19 @@
     });
     if (avail.hindi) out.push({ kind: 'hi', name: 'Hindi', langs: ['Hindi'] });
     if (avail.hindi2) out.push({ kind: 'hi2', name: 'Hindi-2', langs: ['Hindi'] });
-    if (avail.hindi3) out.push({ kind: 'hi3', name: 'Hindi-3', langs: ['Hindi'] });
     if (avail.zanime) out.push({ kind: 'za', name: 'Z-Anime', langs: ['Japanese', 'English'] });
     return out;
   }
   function providerDesc(p) {
     if (p.kind === 'hi') return 'Hindi dub · ToonStream';
     if (p.kind === 'hi2') return 'Hindi dub · Rare Animes';
-    if (p.kind === 'hi3') return 'Hindi dub · AnimeHindiDubbed';
     if (p.kind === 'za') return 'English sub & dub · Z-Player';
     var bits = [];
     if (p.sub) bits.push('sub'); if (p.dub) bits.push('dub');
     return 'English ' + (bits.join(' & ') || 'stream') + ' · FlixCloud';
   }
   function providerLangs(p) {
-    if (p.kind === 'hi' || p.kind === 'hi2' || p.kind === 'hi3') return ['Hindi'];
+    if (p.kind === 'hi' || p.kind === 'hi2') return ['Hindi'];
     if (p.kind === 'za') return ['Japanese', 'English'];
     var l = [];
     if (p.sub) l.push('Japanese');
@@ -696,15 +688,6 @@
               encodeURIComponent(r.fileId),
             audioTracks: [], subtitles: [],
             providerLabel: 'Hindi-2 · Rare Animes' };
-        });
-      }
-      if (prov.kind === 'hi3') {
-        // Hindi-3: the phone resolves the abyssplayer embed (AES-CTR
-        // decrypt) and the backend proxies the MP4 with the CDN's required
-        // Referer header.
-        return window.h3Watch(ctx.title, n).then(function (w) {
-          return { url: w.stream, audioTracks: [], subtitles: [],
-            providerLabel: 'Hindi-3 · AnimeHindiDubbed' };
         });
       }
       if (prov.kind === 'za') {

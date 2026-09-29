@@ -68,10 +68,12 @@ Obey this on every update. Updated 2026-09-30.
    m3u8 playlists are already rewritten to worker URLs, so
    `hiResolveHls` skips `hiRewritePlaylist` when it sees
    `workers.dev/hls?d=` (double-proxy breaks playback).
-3d. **Hindi-3 blocked by broken CDN, 2026-09-30**: code is correct
-   (decrypt + episode match + proxy verified) but `*.sssrr.org` serves
-   truncated files, so playback fails. Nothing to fix in our code until
-   the CDN recovers or a new Hindi source is built.
+3d. **Hindi-3 REMOVED, 2026-09-30**: Imran ordered removal. The
+   `*.sssrr.org` CDN serves truncated files, so the provider could never
+   play. Removed: `hindi3` availability/button/watch handler/label from
+   `js/stream.js`. `js/ahd-hindi-provider.js` stays loaded ONLY as a shared
+   utility — Hindi-1's `hiAbyss` fallback uses its `h3AbyssDecrypt`.
+   (If the CDN ever recovers, the provider code is in git history.)
 4. **A source dies completely**: **remove the provider button** — standing rule, no fake buttons.
    Tell Imran plainly what died.
 9. **Stream CDN returns "Invalid signature" / endless loading** (happened with Hindi-2's
