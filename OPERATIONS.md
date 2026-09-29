@@ -15,6 +15,7 @@ Obey this on every update. Updated 2026-09-30.
 | reanime.to + flixcloud.cc | English sub/dub streams (HD-1, HD-2 providers) | Not ours — can break or block us anytime |
 | ToonStream → TurboNewVid → RubySTM → VidMoly | Hindi streams (Hindi provider) | Not ours — can break anytime |
 | codedew.com + rareamimes.mov | Hindi-2 streams (Rare Animes India) | Not ours — can break anytime |
+| animehindidubbed.in + abyssplayer.com | Hindi-3 streams (AnimeHindiDubbed) | Not ours — can break anytime |
 
 ## Tools we use
 
@@ -39,6 +40,15 @@ Obey this on every update. Updated 2026-09-30.
 3. **Source changes its embed/encryption** (new host, new `_juicycodes` algorithm):
    Fetch a real embed page, re-decode, update `js/codedew-hindi-provider.js` or `js/flixcloud.js`,
    push, Imran tests on phone.
+3b. **Hindi-3 (abyssplayer) stops resolving**: the extraction is
+   `js/ahd-hindi-provider.js` — search `?s=` → `serverVideos` literal →
+   servabyss `abyssplayer.com/<slug>` embed → page's `datas` base64 JSON →
+   AES-256-CTR decrypt with key = MD5-hex of `user_id:slug:md5_id`
+   (counter = first 16 key bytes, length 128) → best `mp4.fristDatas`
+   (note upstream misspelling) URL → `/api/stream/r` with
+   `xreferer=https://abyssplayer.com/` (CDN 403s without that Referer;
+   the phone browser cannot spoof it, so it must be proxied).
+   Direct media CDN observed: `*.sssrr.org`.
 4. **A source dies completely**: **remove the provider button** — standing rule, no fake buttons.
    Tell Imran plainly what died.
 9. **Stream CDN returns "Invalid signature" / endless loading** (happened with Hindi-2's
