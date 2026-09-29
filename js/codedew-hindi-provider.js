@@ -111,13 +111,15 @@ function cdSearch(q) {
   return cdGetText(url).then(function (html) {
     var doc = cdDoc(html), out = [], seen = {};
     if (!doc) return out;
-    // Search results are <h2> or <h3> with links to /hindi/<slug>/
-    doc.querySelectorAll('a[href*="rareanimes.mov/hindi/"]').forEach(function (a) {
+    // Search results are <h2>/<h3> entry-title links. Restrict the selector
+    // to those: nav menus, sidebars and footers repeat the same /hindi/
+    // URLs with short labels ("Season 9") that would otherwise win dedup
+    // and hide the real titled result.
+    doc.querySelectorAll('h2 a[href*="rareanimes.mov/hindi/"], h3 a[href*="rareanimes.mov/hindi/"]').forEach(function (a) {
       var href = a.getAttribute('href') || '';
       if (seen[href]) return;
       // Only take links that look like detail pages (not anchors)
       if (!/\/hindi\/[^\/]+\/$/.test(href)) return;
-      seen[href] = 1;
       var title = (a.textContent || '').trim();
       // The <h2> contains the full title like "Naruto Shippuden Season 09 – ..."
       if (!title || title.length < 3) {
@@ -125,6 +127,10 @@ function cdSearch(q) {
         if (h) title = h.textContent.trim();
       }
       if (!title || title.length < 3) return;
+      // Mark seen only once we have a usable title: the post-thumbnail
+      // anchor (empty text) appears before the <h2> anchor with the same
+      // href, and must not poison dedup for it.
+      seen[href] = 1;
       try { href = new URL(href, RARE).toString(); } catch (e) {}
       out.push({ title: title, href: href });
     });
@@ -260,36 +266,58 @@ function cdHlsConfig(referer) {
 
 /* ---------- high-level: match title -> find series -> episode -> stream ---------- */
 var cdMatchCache = {};
+// Score raw search results against the normalized query; returns the
+// acceptable matches sorted best-first (ties broken by lower season).
+function cdScoreResults(rs, nq) {
+  var scored = [];
+  (rs || []).forEach(function (r) {
+    var nt = normTitle(r.title), s = 0;
+    if (nt === nq) s = 100;
+    else if (nt.indexOf(nq) === 0 || nq.indexOf(nt) === 0) s = 70;
+    else if (nt.indexOf(nq) >= 0 || nq.indexOf(nt) >= 0) s = 40;
+    else {
+      var qw = nq.split(' '), hit = 0;
+      var tw = {};
+      nt.split(' ').forEach(function (w) { tw[w] = 1; });
+      qw.forEach(function (w) { if (w.length > 2 && tw[w]) hit++; });
+      if (hit >= 2 && hit >= qw.length - 1) s = 50;
+    }
+    // Prefer lower season numbers on ties (S1 before S2)
+    var season = 99;
+    var sm = nt.match(/season\s*(\d+)/);
+    if (sm) season = parseInt(sm[1], 10);
+    if (s >= 40) scored.push({ r: r, s: s, season: season });
+  });
+  scored.sort(function (a, b) {
+    return (b.s - a.s) || (a.season - b.season);
+  });
+  return scored.map(function (x) { return x.r; });
+}
 // Returns ALL good matches sorted by score (best first), so callers can
 // try each candidate (e.g. Season 1 vs Season 2 pages) until one works.
 function cdMatches(title) {
   var k = normTitle(title);
   if (!cdMatchCache[k]) {
-    cdMatchCache[k] = cdSearch(title).then(function (rs) {
-      var nq = normTitle(title), scored = [];
-      (rs || []).forEach(function (r) {
-        var nt = normTitle(r.title), s = 0;
-        if (nt === nq) s = 100;
-        else if (nt.indexOf(nq) === 0 || nq.indexOf(nt) === 0) s = 70;
-        else if (nt.indexOf(nq) >= 0 || nq.indexOf(nt) >= 0) s = 40;
-        else {
-          var qw = nq.split(' '), hit = 0;
-          var tw = {};
-          nt.split(' ').forEach(function (w) { tw[w] = 1; });
-          qw.forEach(function (w) { if (w.length > 2 && tw[w]) hit++; });
-          if (hit >= 2 && hit >= qw.length - 1) s = 50;
-        }
-        // Prefer lower season numbers on ties (S1 before S2)
-        var season = 99;
-        var sm = nt.match(/season\s*(\d+)/);
-        if (sm) season = parseInt(sm[1], 10);
-        if (s >= 40) scored.push({ r: r, s: s, season: season });
-      });
-      scored.sort(function (a, b) {
-        return (b.s - a.s) || (a.season - b.season);
-      });
-      return scored.map(function (x) { return x.r; });
-    }, function () { return []; });
+    cdMatchCache[k] = (function () {
+      // WordPress ?s= chokes on punctuation: "Frieren: Beyond Journey's End"
+      // returns zero results while "frieren" finds both season pages.
+      // Fall back to progressively shorter queries until something scores.
+      var words = k.split(' ').filter(Boolean);
+      var queries = [k];
+      for (var L = Math.min(3, words.length - 1); L >= 1; L--) {
+        queries.push(words.slice(0, L).join(' '));
+      }
+      var qi = 0;
+      function nextQuery() {
+        if (qi >= queries.length) return Promise.resolve([]);
+        var q = queries[qi++];
+        return cdSearch(q).then(function (rs) {
+          var ms = cdScoreResults(rs, k);
+          return ms.length ? ms : nextQuery();
+        }, function () { return nextQuery(); });
+      }
+      return nextQuery();
+    })();
   }
   return cdMatchCache[k];
 }
