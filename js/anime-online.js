@@ -953,8 +953,9 @@
     var rel = (d.relations || []).length
       ? '<section class="online-block"><h2>Related</h2><div class="poster-grid online-grid">' +
         d.relations.map(function (r) {
+          var rManga = r.format === 'MANGA';
           return '<a class="poster-card" href="#/' + SEC_ID + '/online/' + d.provider + '/' +
-            (isManga ? 'manga/' : '') + encodeURIComponent(r.id) + '"><span class="poster-img"><img src="' +
+            (rManga ? 'manga/' : '') + encodeURIComponent(r.id) + '"><span class="poster-img"><img src="' +
             esc(r.image) + '" alt="' + esc(r.title) + '" loading="lazy">' + posterScore(r) +
             '</span><span class="poster-title">' +
             esc(r.title) + '</span><span class="poster-meta">' + esc(r.kind || '') + '</span></a>';
