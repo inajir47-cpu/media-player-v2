@@ -258,7 +258,9 @@
     var prov = d.provider || provider;
     var anilistId = (prov === 'anilist' && d.id) ? parseInt(d.id, 10) : null;
     if (!Number.isFinite(anilistId)) anilistId = null;
-    var ctx = { anilistId: anilistId, title: d.title || '' };
+    var ctx = { anilistId: anilistId, title: d.title || '', poster: d.image || '',
+                provider: prov, pid: String(id != null ? id : (d.id != null ? d.id : '')),
+                isMovie: !isManga && String(d.format || '').toUpperCase() === 'MOVIE' };
     if (!ctx.anilistId && !ctx.title) return;
     Array.prototype.forEach.call(mount.querySelectorAll('[data-ep-grid]'), function (grid) {
       Array.prototype.forEach.call(
@@ -278,6 +280,168 @@
         });
       }).observe(grid, { childList: true, subtree: true });
     });
+    wireWatchButtons(mount, d, ctx);
+  }
+
+  /* ---------- detail-page Play + Watchlist buttons (watch history) ---------- */
+  function wh() { return (window.MPV2 && window.MPV2.Watch) || null; }
+  function playTargetEp(d, entry) {
+    if (ctxIsMovie(d)) return 1;
+    var total = parseInt(d.episodes, 10) || 0;
+    if (!entry) return 1;
+    if (wh().isDone(entry)) {
+      var nx = (entry.episode || 1) + 1;
+      return (total && nx > total) ? 1 : nx;
+    }
+    return entry.episode || 1;
+  }
+  function ctxIsMovie(d) {
+    return String(d.format || '').toUpperCase() === 'MOVIE';
+  }
+  function playLabel(d, entry) {
+    var W = wh();
+    if (ctxIsMovie(d)) return (entry && !W.isDone(entry)) ? 'Continue watching' : 'Start watching';
+    if (!entry) return 'Start watching E1';
+    if (W.isDone(entry)) {
+      var total = parseInt(d.episodes, 10) || 0;
+      var nx = (entry.episode || 1) + 1;
+      return (total && nx > total) ? 'Start watching E1' : 'Start watching E' + nx;
+    }
+    return 'Continue E' + entry.episode;
+  }
+  // Click the episode card's globe button (waits briefly while cards load).
+  function playEpisodeCard(mount, n) {
+    function tryClick() {
+      var card = mount.querySelector('.episode-card[data-ep-n="' + n + '"]');
+      if (card) {
+        try { card.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {}
+        var g = card.querySelector('.st-globe');
+        if (g) { g.click(); return true; }
+      }
+      return false;
+    }
+    if (tryClick()) return;
+    var tries = 0;
+    var t = setInterval(function () {
+      if (tryClick() || ++tries > 40) clearInterval(t);
+    }, 300);
+  }
+  function wireWatchButtons(mount, d, ctx) {
+    var W = wh();
+    if (!W) return;
+    var copy = mount.querySelector('.detail-copy');
+    if (!copy || copy.querySelector('[data-wh-row]')) return;
+    var key = W.keyFor(ctx);
+    var row = document.createElement('div');
+    row.className = 'wh-row';
+    row.setAttribute('data-wh-row', '1');
+    var playBtn = document.createElement('button');
+    playBtn.type = 'button';
+    playBtn.className = 'wh-play';
+    var saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'wh-save';
+    function refresh() {
+      if (!document.contains(row)) {
+        document.removeEventListener('mpv2:history', refresh);
+        return;
+      }
+      var entry = W.getEntry(key);
+      playBtn.innerHTML = icon('play') + '<span>' + esc(playLabel(d, entry)) + '</span>';
+      var saved = W.isSaved(key);
+      saveBtn.classList.toggle('saved', saved);
+      saveBtn.innerHTML = icon('bookmark') +
+        '<span>' + (saved ? 'Saved' : 'Watchlist') + '</span>';
+      saveBtn.setAttribute('aria-pressed', String(saved));
+    }
+    playBtn.addEventListener('click', function () {
+      var entry = W.getEntry(key);
+      var n = playTargetEp(d, entry);
+      if (ctx.isMovie) {
+        checkEpisodeStaged(ctx, 1, function (avail) { openProviderDialog(ctx, 1, avail); });
+      } else {
+        playEpisodeCard(mount, n);
+      }
+    });
+    saveBtn.addEventListener('click', function () {
+      var nowSaved = W.toggleWatchlist({
+        key: key, kind: ctx.isMovie ? 'movie' : 'anime',
+        title: ctx.title, poster: ctx.poster, href: location.hash,
+        provider: ctx.provider, pid: ctx.pid
+      });
+      refresh();
+      if (window.MPV2 && typeof window.MPV2.toast === 'function') {
+        window.MPV2.toast(nowSaved ? 'Saved to watchlist' : 'Removed from watchlist');
+      }
+    });
+    row.appendChild(playBtn);
+    row.appendChild(saveBtn);
+    copy.appendChild(row);
+    document.addEventListener('mpv2:history', refresh);
+    refresh();
+  }
+
+  /* ---------- playback progress tracking ---------- */
+  var activeTrack = null; // { video, track } — saved on close
+  function trackEntry(track, video) {
+    var W = wh();
+    return {
+      key: W.keyFor(track.ctx),
+      kind: track.ctx.isMovie ? 'movie' : 'anime',
+      title: track.ctx.title || '',
+      poster: track.ctx.poster || '',
+      href: location.hash,
+      provider: track.ctx.provider || '',
+      pid: track.ctx.pid || '',
+      anilistId: track.ctx.anilistId || null,
+      season: track.ctx.season || 1,
+      episode: track.n,
+      position: Math.floor(video.currentTime || 0),
+      duration: Math.floor(video.duration || 0),
+      lang: track.lang || ''
+    };
+  }
+  function saveTrack(video, track) {
+    var W = wh();
+    if (!W || !video || !track) return;
+    if (!(video.currentTime > 3)) return; // ignore instant opens
+    var entry = trackEntry(track, video);
+    if (!(entry.duration > 0)) {
+      // metadata not loaded yet — keep the previously known duration, if any
+      var prev = W.getEntry(entry.key);
+      if (prev && prev.duration > 0) entry.duration = prev.duration;
+    }
+    W.upsert(entry);
+  }
+  function wireHistoryTrack(video, shell, track) {
+    var W = wh();
+    if (!W || !track || !track.ctx) return;
+    activeTrack = { video: video, track: track };
+    var lastSave = 0;
+    video.addEventListener('timeupdate', function () {
+      var now = Date.now();
+      if (now - lastSave < 8000) return;
+      lastSave = now;
+      saveTrack(video, track);
+    });
+    video.addEventListener('pause', function () { saveTrack(video, track); });
+    video.addEventListener('ended', function () {
+      var W2 = wh();
+      if (W2) W2.upsert(trackEntry(track, video));
+      activeTrack = null;
+    });
+    // resume where the user left off in this same episode
+    var entry = W.getEntry(W.keyFor(track.ctx));
+    if (entry && entry.episode === track.n && !W.isDone(entry) && entry.position > 10) {
+      var at = entry.position;
+      var seek = function () { try { video.currentTime = at; } catch (e) {} };
+      video.addEventListener('loadedmetadata', function onM() {
+        video.removeEventListener('loadedmetadata', onM);
+        seek();
+      });
+      // hls.js path: metadata may already be parsed — try shortly after attach
+      setTimeout(seek, 1500);
+    }
   }
 
   /* ---------- Choose Provider dialog (matches Imran's reference) ---------- */
@@ -392,6 +556,10 @@
   /* ---------- in-app player ---------- */
   var playerHls = null, playerBlobUrls = [];
   function closePlayer() {
+    if (activeTrack) {
+      try { saveTrack(activeTrack.video, activeTrack.track); } catch (e) {}
+      activeTrack = null;
+    }
     if (playerHls) { try { playerHls.destroy(); } catch (e) {} playerHls = null; }
     playerBlobUrls.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) {} });
     playerBlobUrls = [];
@@ -401,6 +569,7 @@
 
   function startWatch(ctx, n, prov, lang) {
     var shell = openPlayerShell(ctx, n, prov.name, lang);
+    var track = { ctx: ctx, n: n, prov: prov, lang: lang };
     var done = false;
     function resolve() {
       if (prov.kind === 'hi') {
@@ -422,7 +591,7 @@
     }
     resolve().then(function (s) {
       if (done) return;
-      attachStream(shell, s, lang);
+      attachStream(shell, s, lang, track);
     }, function (err) {
       if (done) return;
       playerFail(shell, err && err.message ? err.message : 'Could not load this stream');
@@ -430,7 +599,7 @@
     shell.querySelector('.st-p-retry').addEventListener('click', function () {
       shell.querySelector('.st-p-error').classList.add('hidden');
       shell.querySelector('.st-p-loading').classList.remove('hidden');
-      resolve().then(function (s) { attachStream(shell, s, lang); },
+      resolve().then(function (s) { attachStream(shell, s, lang, track); },
         function (err) { playerFail(shell, err && err.message ? err.message : 'Could not load this stream'); });
     });
     return function () { done = true; };
@@ -465,9 +634,10 @@
     err.classList.remove('hidden');
   }
 
-  function attachStream(shell, s, wantLang) {
+  function attachStream(shell, s, wantLang, track) {
     var video = shell.querySelector('.st-p-video');
     shell.querySelector('.st-p-loading').classList.add('hidden');
+    wireHistoryTrack(video, shell, track);
     // subtitles (proxied urls from the backend; srt -> vtt conversion)
     (s.subtitles || []).forEach(function (sub) {
       fetch(sub.url).then(function (r) {
@@ -620,6 +790,10 @@
   window.MPV2.Stream = {
     wireDetail: wireDetail,
     checkEpisode: function (ctx, n) { return checkEpisodeStaged(ctx, n, function () {}); },
-    openProviderDialog: openProviderDialog
+    openProviderDialog: openProviderDialog,
+    // Direct playback for one episode (used by Recently Watched continue).
+    playEpisode: function (ctxLike, n) {
+      checkEpisodeStaged(ctxLike, n, function (avail) { openProviderDialog(ctxLike, n, avail); });
+    }
   };
 })();

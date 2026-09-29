@@ -297,16 +297,41 @@
       '<span class="poster-meta">' + esc(item.year) + ' · ' + esc(item.kind) + '</span></a>';
   }
   /* STEP 5b: dedicated Watchlist page, reached from the top-bar bookmark. */
+  /* STEP 5b: dedicated Watchlist page, reached from the top-bar bookmark.
+   * Merges the local catalogue watchlist with titles saved from streaming
+   * detail pages (Save to Watchlist). */
   function renderWatchlist(sec) {
     var ids = getWatchlist();
-    var items = ids.map(function (id) { return window.MPV2.findTitle(sec.id, id); })
+    var local = ids.map(function (id) { return window.MPV2.findTitle(sec.id, id); })
       .filter(function (t) { return !!t; });
-    if (!items.length) {
+    var W = window.MPV2.Watch;
+    var online = (W ? W.getWatchlist() : []).filter(function (it) {
+      // keep only entries belonging to this section (from the stored href)
+      var m = /^#\/([^/]+)\//.exec(it.href || '');
+      return m ? m[1] === sec.id : true;
+    });
+    var total = local.length + online.length;
+    if (!total) {
       return pageHead(sec, 'Watchlist', 'Titles you save will appear here.') +
         emptyState('bookmark', 'Your watchlist is empty', 'Add a title from its details page, then it will be ready here.');
     }
-    return pageHead(sec, 'Watchlist', items.length + ' saved title' + (items.length === 1 ? '' : 's') + '.') +
-      '<div class="poster-grid cards">' + items.map(function (t) { return posterCard(sec, t); }).join('') + '</div>';
+    var out = pageHead(sec, 'Watchlist', total + ' saved title' + (total === 1 ? '' : 's') + '.');
+    if (local.length) {
+      out += '<div class="poster-grid cards">' + local.map(function (t) { return posterCard(sec, t); }).join('') + '</div>';
+    }
+    if (online.length) {
+      out += '<section class="row"><div class="row-head"><h2>Saved from streaming</h2>' +
+        '<span class="muted-link">' + online.length + ' title' + (online.length === 1 ? '' : 's') + '</span></div>' +
+        '<div class="poster-grid cards">' + online.map(function (it) {
+          return '<a class="poster-card" href="' + esc(it.href || '#/' + sec.id + '/home') + '">' +
+            '<span class="poster-img">' +
+              (it.poster ? '<img src="' + esc(it.poster) + '" alt="' + esc(it.title || '') + ' poster" loading="lazy">' : '') +
+            '</span>' +
+            '<span class="poster-title">' + esc(it.title || 'Untitled') + '</span>' +
+            '<span class="poster-meta">' + esc(it.kind === 'movie' ? 'Movie' : 'Series') + '</span></a>';
+        }).join('') + '</div></section>';
+    }
+    return out;
   }
   function cardRow(sec, items) {
     if (!items.length) {
@@ -330,8 +355,66 @@
       '<h2>' + esc(title) + '</h2><p>' + esc(text) + '</p></div>';
   }
 
+  /* Watch-history cards (shared by the home carousel and the History page). */
+  function historyCardHtml(sec, e) {
+    var W = window.MPV2.Watch;
+    var pct = W.progressPct(e);
+    var done = W.isDone(e);
+    var badge = e.kind === 'movie' ? 'MOVIE' : ('S' + (e.season || 1) + ' E' + e.episode);
+    var meta = (e.lang ? e.lang + ' · ' : '') + (done ? 'Completed' : (e.position > 3 ? W.fmtLeft(e) : 'Just started'));
+    return '<article class="rw-card">' +
+      '<a class="rw-main" href="' + esc(e.href || '#/' + sec.id + '/home') + '">' +
+        '<span class="rw-poster">' +
+          (e.poster ? '<img src="' + esc(e.poster) + '" alt="" loading="lazy">' : '<span class="rw-noposter">' + icon('play') + '</span>') +
+          '<span class="rw-badge">' + esc(badge) + '</span>' +
+        '</span>' +
+        '<span class="rw-info"><b>' + esc(e.title || 'Untitled') + '</b>' +
+          '<small>' + esc(meta) + '</small>' +
+          '<span class="rw-bar"><i style="width:' + pct + '%"></i></span>' +
+        '</span>' +
+      '</a>' +
+      '<button type="button" class="rw-go" data-rw-play="' + esc(e.key) + '" aria-label="Continue watching ' + esc(e.title || '') + '">' +
+        icon('play') + '<span>' + (done ? 'Replay' : 'Continue') + '</span>' +
+      '</button>' +
+    '</article>';
+  }
+  /* Watch-history entries for one section: movies -> movies, everything else -> anime. */
+  function historyForSection(secId) {
+    var W = window.MPV2.Watch;
+    if (!W) return [];
+    var wantMovie = secId === 'movies';
+    return W.getHistory().filter(function (e) {
+      return wantMovie ? e.kind === 'movie' : e.kind !== 'movie';
+    });
+  }
+  function renderHistoryPage(sec) {
+    var items = historyForSection(sec.id);
+    var head = pageHead(sec, 'History', items.length
+      ? items.length + ' title' + (items.length === 1 ? '' : 's') + ' in your viewing activity.'
+      : 'Your viewing activity.');
+    if (!items.length) {
+      return head + emptyState('history', 'Nothing watched yet', 'Completed and in-progress titles will appear here.');
+    }
+    var cards = items.map(function (e) { return historyCardHtml(sec, e); }).join('');
+    return head +
+      '<div class="row-head"><span class="muted-link">Latest first</span>' +
+      '<button type="button" class="link-btn" id="clearHistory">Clear history</button></div>' +
+      '<div class="rw-list">' + cards + '</div>';
+  }
+
   /* STEP 7 · CHUNK 1: section-home markup as a pure string, shared by the
    * live page and the opening-screen overlay. */
+  function recentWatchedHtml(sec) {
+    var W = window.MPV2.Watch;
+    var items = W ? W.recentForSection(sec.id) : [];
+    var head = '<section class="row"><div class="row-head"><h2>Recently Watched</h2>' +
+      '<span class="muted-link">' + (items.length ? items.length + ' title' + (items.length === 1 ? '' : 's') : 'Your progress') + '</span></div>';
+    if (!items.length) {
+      return head + emptyState('history', 'Nothing watched yet', 'Episodes and movies you watch will appear here with your progress.') + '</section>';
+    }
+    var cards = items.map(function (e) { return historyCardHtml(sec, e); }).join('');
+    return head + '<div class="rw-strip">' + cards + '</div></section>';
+  }
   function homeHtml(sec) {
     // ONLINE PHASE: the Animation home gets a live hero carousel
     // (airing / trending / recommended / manga), other sections keep the
@@ -344,9 +427,24 @@
         '<p>Your featured title and viewing progress will live here as the library grows.</p>' +
       '</div></section>';
     return pageHead(sec, 'Home', 'Your main library view.') + hero +
-      '<section class="row"><div class="row-head"><h2>Recently added</h2>' +
-      '<span class="muted-link">Library row</span></div>' +
-      cardRow(sec, sectionTitles(sec).slice(0, 6)) + '</section>';
+      recentWatchedHtml(sec);
+  }
+
+  // Recently Watched: continue buttons resume playback directly.
+  function wireRecentWatched(root) {
+    root.querySelectorAll('[data-rw-play]').forEach(function (b) {
+      b.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        var W = window.MPV2.Watch, S = window.MPV2.Stream;
+        if (!W || !S) return;
+        var e = W.getEntry(b.getAttribute('data-rw-play'));
+        if (!e) return;
+        S.playEpisode({
+          anilistId: e.anilistId, title: e.title, poster: e.poster,
+          provider: e.provider, pid: e.pid, isMovie: e.kind === 'movie'
+        }, e.kind === 'movie' ? 1 : (e.episode || 1));
+      });
+    });
   }
 
   function renderPage(sec, tab, root) {
@@ -380,8 +478,7 @@
           '</div></section>' +
         '<div class="file-results" id="fileResults"></div>';
     } else if (tab === 'history') {
-      html = pageHead(sec, 'History', 'Your viewing activity.') +
-        emptyState('history', 'Nothing watched yet', 'Completed and in-progress titles will appear here.');
+      html = renderHistoryPage(sec);
     } else if (tab === 'settings') {
       html = renderSettings(sec);
     } else if (tab === 'watchlist') {
@@ -1618,6 +1715,19 @@
     // ONLINE PHASE: hero carousel on the Animation home page.
     if (tab === 'home' && sec.id === 'animation' && window.MPV2.mountHero) {
       window.MPV2.mountHero(sec, root);
+    }
+    // Recently Watched continue buttons (home + history pages).
+    if (tab === 'home' || tab === 'history') wireRecentWatched(root);
+    // History page: clear button.
+    if (tab === 'history') {
+      var clearBtn = root.querySelector('#clearHistory');
+      if (clearBtn) clearBtn.addEventListener('click', function () {
+        var W = window.MPV2.Watch;
+        if (!W || !confirm('Clear your watch history?')) return;
+        W.getHistory().slice().forEach(function (e) { W.removeEntry(e.key); });
+        render();
+        toast('Watch history cleared');
+      });
     }
     // ONLINE PHASE: Discover block on the Animation home page.
     if (tab === 'home' && sec.id === 'animation' && window.MPV2.mountDiscoverBlock) {

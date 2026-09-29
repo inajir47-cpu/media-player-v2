@@ -177,6 +177,23 @@
 button.trailer-btn { border: 0; cursor: pointer; font-family: inherit; }
 .wo-btn { margin-left: 8px; }
 
+/* Watch history: Play + Save-to-Watchlist row on the detail page */
+.wh-row { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.wh-play { display: inline-flex; align-items: center; gap: 8px; border: 0; cursor: pointer;
+  font-family: inherit; font-weight: 800; font-size: 15px; color: #fff;
+  background: var(--tone); padding: 12px 26px; border-radius: 999px;
+  box-shadow: 0 6px 22px color-mix(in srgb, var(--tone) 50%, transparent); }
+.wh-play .icon { width: 18px; height: 18px; }
+.wh-play:active { transform: scale(.97); }
+.wh-save { display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  font-family: inherit; font-weight: 700; font-size: 14px; color: var(--ink, #fff);
+  background: color-mix(in srgb, var(--tone) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tone) 45%, transparent);
+  padding: 12px 20px; border-radius: 999px; }
+.wh-save .icon { width: 17px; height: 17px; }
+.wh-save.saved { background: color-mix(in srgb, var(--tone) 30%, transparent); }
+.wh-save.saved .icon { fill: var(--tone); }
+
 /* Watch Order popup */
 .wo-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,.74);
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
