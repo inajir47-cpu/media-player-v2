@@ -259,7 +259,7 @@
   }
   // Staged: paints EN badges as soon as ready, re-paints when Hindi resolves.
   function checkEpisodeStaged(ctx, n, cb) {
-    var avail = { sub: false, dub: false, hindi: false, hindi2: false, servers: [] };
+    var avail = { sub: false, dub: false, hindi: false, hindi2: false, zanime: false, servers: [] };
     var jobs = [];
     if (ctx.anilistId) {
       jobs.push(enServers(ctx.anilistId, n).then(function (ss) {
@@ -268,6 +268,12 @@
         avail.dub = ss.some(function (s) { return s.dataType === 'dub'; });
         cb(avail);
       }));
+    }
+    if (ctx.anilistId && typeof window.zaHasEpisode === 'function') {
+      jobs.push(window.zaHasEpisode(ctx.anilistId, n).then(function (z) {
+        avail.zanime = !!z;
+        cb(avail);
+      }, function () { cb(avail); }));
     }
     if (ctx.title && typeof window.hiSearch === 'function') {
       jobs.push(hindiWithRetry(ctx.title, n, 0).then(function (h) {
@@ -304,10 +310,11 @@
     if (openDlg && openDlg.n === n) { try { openDlg.refresh(); } catch (e) {} }
     var old = card.querySelector('.st-badges'); if (old) old.remove();
     var oldG = card.querySelector('.st-globe'); if (oldG) oldG.remove();
-    if (!avail.sub && !avail.dub && !avail.hindi && !avail.hindi2) return;
+    if (!avail.sub && !avail.dub && !avail.hindi && !avail.hindi2 && !avail.zanime) return;
     var tags = '';
     if (avail.sub) tags += '<i class="st-b st-sub">SUB</i>';
     if (avail.dub) tags += '<i class="st-b st-dub">DUB</i>';
+    if (avail.zanime) tags += '<i class="st-b st-sub">Z</i>';
     if (avail.hindi) tags += '<i class="st-b st-hi">HINDI</i>';
     if (avail.hindi2 && !avail.hindi) tags += '<i class="st-b st-hi">HINDI</i>';
     var badges = document.createElement('span');
@@ -530,17 +537,20 @@
     });
     if (avail.hindi) out.push({ kind: 'hi', name: 'Hindi', langs: ['Hindi'] });
     if (avail.hindi2) out.push({ kind: 'hi2', name: 'Hindi-2', langs: ['Hindi'] });
+    if (avail.zanime) out.push({ kind: 'za', name: 'Z-Anime', langs: ['Japanese', 'English'] });
     return out;
   }
   function providerDesc(p) {
     if (p.kind === 'hi') return 'Hindi dub · ToonStream';
     if (p.kind === 'hi2') return 'Hindi dub · Rare Animes';
+    if (p.kind === 'za') return 'English sub & dub · Z-Player';
     var bits = [];
     if (p.sub) bits.push('sub'); if (p.dub) bits.push('dub');
     return 'English ' + (bits.join(' & ') || 'stream') + ' · FlixCloud';
   }
   function providerLangs(p) {
     if (p.kind === 'hi' || p.kind === 'hi2') return ['Hindi'];
+    if (p.kind === 'za') return ['Japanese', 'English'];
     var l = [];
     if (p.sub) l.push('Japanese');
     if (p.dub) l.push('English');
@@ -673,6 +683,14 @@
             providerLabel: 'Hindi-2 · Rare Animes', referer: w._referer };
         });
       }
+      if (prov.kind === 'za') {
+        // Z-Anime: the worker serves a full HTML player page, so we hand
+        // back an embed URL and let the player shell load it in an iframe.
+        var audio = (lang === 'English') ? 'dub' : 'sub';
+        var embed = window.ZAnimeProvider.embedUrl(ctx.anilistId, n, audio, 'hd-1');
+        return Promise.resolve({ embed: embed, audioTracks: [], subtitles: [],
+          providerLabel: 'Z-Anime · Z-Player' });
+      }
       return enReanimeId(ctx.anilistId, ctx.title).then(function (animeId) {
         if (!animeId) throw new Error('Could not match this title on the stream server');
         return enWatch(animeId, ctx.anilistId, n, lang === 'English' ? 'dub' : 'sub');
@@ -731,6 +749,20 @@
   }
 
   function attachStream(shell, s, wantLang, track) {
+    // Z-Anime (and other embed providers): load the provider's own player
+    // page in an iframe instead of our <video> element.
+    if (s.embed) {
+      shell.querySelector('.st-p-loading').classList.add('hidden');
+      var video = shell.querySelector('.st-p-video');
+      var frame = document.createElement('iframe');
+      frame.className = 'st-p-video st-p-embed';
+      frame.src = s.embed;
+      frame.setAttribute('allow', 'autoplay; fullscreen; picture-in-picture');
+      frame.setAttribute('allowfullscreen', '');
+      frame.style.border = '0';
+      video.replaceWith(frame);
+      return;
+    }
     var video = shell.querySelector('.st-p-video');
     shell.querySelector('.st-p-loading').classList.add('hidden');
     wireHistoryTrack(video, shell, track);
