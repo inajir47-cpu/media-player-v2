@@ -273,6 +273,17 @@
                 return { url: m[1], type: 'hls', referer: embedUrl, origin: 'https://vidmoly.net' };
               });
             }
+            function hiTurbo(embedUrl) {
+              // TurboNewVid embed page carries the m3u8 in plain text:
+              //   var urlPlay = \'https://cdn3.turbonewvid.com/data3/<hash>/<hash>.m3u8\';
+              return dmGetText(hiProxyX(embedUrl, TOON + '/', null), 20000, false).then(function (html) {
+                var m = String(html).match(/var\s+urlPlay\s*=\s*\\'([^'\\]+\.m3u8[^'\\]*)\\'/i)
+                  || String(html).match(/data-hash="(https?:\/\/[^"]+\.m3u8[^"]*)"/i)
+                  || String(html).match(/['"](https?:\/\/[^'"]+\.m3u8[^'"]*)['"]/i);
+                if (!m) throw new Error('turbo: no stream');
+                return { url: m[1], type: 'hls', referer: embedUrl, origin: 'https://turbonewvid.com' };
+              });
+            }
             function hiRewritePlaylist(text, playlistUrl, referer, origin) {
               function abs(u) { try { return new URL(u, playlistUrl).toString(); } catch (e) { return u; } }
               function px(u) { return hiProxyX(u, referer, origin); }
@@ -328,7 +339,8 @@
                 function attempt(i) {
                   if (i >= frames.length) return Promise.reject(new Error('All Hindi servers failed for this episode'));
                   var u = frames[i], job;
-                  if (u.indexOf('https://rubystm.com') === 0) job = hiRuby(u);
+                  if (u.indexOf('https://turbonewvid.com/') === 0) job = hiTurbo(u);
+                  else if (u.indexOf('https://rubystm.com') === 0) job = hiRuby(u);
                   else if (u.indexOf('https://vidmoly.net/') === 0) job = hiVidmoly(u);
                   else job = Promise.reject(new Error('unsupported host'));
                   return job.then(function (s) { return s; }, function () { return attempt(i + 1); });
