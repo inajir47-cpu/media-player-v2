@@ -22,6 +22,50 @@ const UPSTREAM_UA =
 
 router.get('/health', (_req, res) => res.json({ ok: true, service: 'stream' }));
 
+// TEMP DEBUG — diagnosing the Render 403 from reanime.to. Remove after.
+router.get('/debug/upstream', async (_req, res) => {
+  const UA2 =
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+  const RE = 'https://reanime.to';
+  const attempts = [];
+  const tryFetch = async (name, url, headers) => {
+    try {
+      const r = await fetch(url, { headers, redirect: 'manual' });
+      const text = await r.text();
+      attempts.push({
+        name,
+        status: r.status,
+        server: r.headers.get('server'),
+        cfRay: r.headers.get('cf-ray'),
+        cfCache: r.headers.get('cf-cache-status'),
+        location: r.headers.get('location'),
+        body: text.slice(0, 500),
+      });
+    } catch (e) {
+      attempts.push({ name, error: e?.message || String(e) });
+    }
+  };
+  await tryFetch('api-minimal', `${RE}/api/v1/search?q=naruto&limit=1`, {
+    'User-Agent': UA2,
+    Accept: 'application/json, */*',
+  });
+  await tryFetch('api-browser-headers', `${RE}/api/v1/search?q=naruto&limit=1`, {
+    'User-Agent': UA2,
+    Accept: 'application/json, text/plain, */*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    Referer: `${RE}/`,
+    Origin: RE,
+    'Sec-Fetch-Site': 'same-origin',
+    'Sec-Fetch-Mode': 'cors',
+  });
+  await tryFetch('homepage', `${RE}/`, {
+    'User-Agent': UA2,
+    Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+  });
+  res.json({ attempts });
+});
+
 // GET /api/stream/en/search?q=
 router.get('/en/search', async (req, res) => {
   const q = String(req.query.q || '').trim();
