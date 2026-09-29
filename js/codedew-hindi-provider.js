@@ -14,6 +14,7 @@
 'use strict';
 
 var CODEDEW = 'https://codedew.com';
+var RARE = 'https://www.rareanimes.mov';
 var EMBED_HOST = 'https://argon.razorshell.space';
 var WORKER = 'https://mpv2-hls-proxy.gmpdi020.workers.dev';
 
@@ -101,51 +102,77 @@ function normTitle(s) {
   return String(s || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-/* ---------- search ---------- */
-// codedew.com search: /?s=<query> (WordPress-style). Returns cards linking to
-// /multiquality/?url=<token> for episodes or series pages.
+/* ---------- search via rareamimes.mov (WordPress, has search) ---------- */
+// codedew.com has NO search; its parent site rareamimes.mov does.
+// Flow: search rareamimes.mov -> detail page -> per-episode
+// "WatchMultiQuality" links (codedew.com URLs with tokens).
 function cdSearch(q) {
-  var url = CODEDEW + '/?s=' + encodeURIComponent(q);
+  var url = RARE + '/?s=' + encodeURIComponent(q);
   return cdGetText(url).then(function (html) {
     var doc = cdDoc(html), out = [], seen = {};
     if (!doc) return out;
-    doc.querySelectorAll('a[href*="codedew.com"]').forEach(function (a) {
+    // Search results are <h2> or <h3> with links to /hindi/<slug>/
+    doc.querySelectorAll('a[href*="rareanimes.mov/hindi/"]').forEach(function (a) {
       var href = a.getAttribute('href') || '';
       if (seen[href]) return;
+      // Only take links that look like detail pages (not anchors)
+      if (!/\/hindi\/[^\/]+\/$/.test(href)) return;
       seen[href] = 1;
-      var title = (a.getAttribute('title') || a.textContent || '').trim();
-      if (!title || title.length < 2) return;
-      // Skip nav links
-      if (/^\s*(Home|Movies|Series|Anime|Contact|DMCA|Privacy)/i.test(title)) return;
+      var title = (a.textContent || '').trim();
+      // The <h2> contains the full title like "Naruto Shippuden Season 09 – ..."
+      if (!title || title.length < 3) {
+        var h = a.closest('h2, h3');
+        if (h) title = h.textContent.trim();
+      }
+      if (!title || title.length < 3) return;
+      try { href = new URL(href, RARE).toString(); } catch (e) {}
       out.push({ title: title, href: href });
     });
     return out;
   }, function () { return []; });
 }
 
-/* ---------- detail: given a series page URL, list episodes ---------- */
-// The multiquality pages list episodes as S1 E1 style links with ?url= tokens.
+/* ---------- detail: parse episode -> codedew URL from rareamimes.mov page ---------- */
 function cdEpisodes(pageUrl) {
   return cdGetText(pageUrl).then(function (html) {
-    var doc = cdDoc(html), eps = [], seen = {};
-    if (!doc) return eps;
-    doc.querySelectorAll('a[href*="?url="]').forEach(function (a) {
-      var href = a.getAttribute('href') || '';
-      if (seen[href]) return;
-      seen[href] = 1;
-      var label = (a.textContent || '').trim();
-      // Parse "S2 E1" / "E5" style labels
-      var m = label.match(/S(\d+)\s*E(\d+)/i) || label.match(/E(\d+)/i);
-      var season = m && m[2] ? parseInt(m[1], 10) : 1;
-      var ep = m ? parseInt(m[m[2] ? 2 : 1], 10) : null;
-      if (!ep) return;
-      // Absolute URL
-      try { href = new URL(href, pageUrl).toString(); } catch (e) {}
-      eps.push({ season: season, number: ep, label: label, url: href });
-    });
-    eps.sort(function (a, b) {
-      return (a.season - b.season) || (a.number - b.number);
-    });
+    var eps = [], seen = {};
+    // Episodes are listed as "Episode 01 – Title" followed by
+    // "Hindi – [WatchMultiQuality](codedew.com URL) [HubCloud] [WatchNow]"
+    // We parse the HTML for Episode NN markers and the next WatchMultiQuality link.
+    var re = /Episode\s+(\d+)[^<]*<\/[^>]+>[\s\S]{0,500}?href="(https:\/\/codedew\.com\/[^"]+)"/gi;
+    var m;
+    while ((m = re.exec(html)) !== null) {
+      var epNum = parseInt(m[1], 10);
+      var url = m[2];
+      if (seen[epNum]) continue;
+      seen[epNum] = 1;
+      // Prefer the multiquality/zipper watch links
+      eps.push({ season: 1, number: epNum, label: 'Episode ' + epNum, url: url });
+    }
+    // Fallback: DOM parse for ?url= links near "Episode" text
+    if (!eps.length) {
+      var doc = cdDoc(html);
+      if (doc) {
+        var walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null, false);
+        var node, lastEp = null;
+        while ((node = walker.nextNode())) {
+          var t = node.textContent || '';
+          var em = t.match(/Episode\s+(\d+)/i);
+          if (em) lastEp = parseInt(em[1], 10);
+          // Check parent for links
+          var parent = node.parentElement;
+          if (parent && lastEp) {
+            var link = parent.querySelector('a[href*="codedew.com"]');
+            if (link && !seen[lastEp]) {
+              seen[lastEp] = 1;
+              eps.push({ season: 1, number: lastEp, label: 'Episode ' + lastEp,
+                url: link.getAttribute('href') });
+            }
+          }
+        }
+      }
+    }
+    eps.sort(function (a, b) { return a.number - b.number; });
     return eps;
   });
 }
