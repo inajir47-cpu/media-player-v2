@@ -23,9 +23,7 @@ function cacheKey(animeId, ep) {
 }
 
 async function getJson(url, referer) {
-  const res = await fetch(url, {
-    headers: { ...H, ...(referer ? { Referer: referer } : {}) },
-  });
+  const res = await smartFetch(url, referer);
   const text = await res.text();
   if (!res.ok) {
     const err = new Error(`reAnime ${res.status} for ${url}`);
@@ -142,9 +140,10 @@ export function proxyStreamUrl(upstreamUrl, animeId, ep) {
 }
 
 /** Route any upstream URL through our Cloudflare Worker HLS proxy. */
-export function workerProxyUrl(upstreamUrl, referer) {
+export function workerProxyUrl(upstreamUrl, referer, keyB64url) {
   let w = `${WORKER_BASE}/hls?d=${b64url(upstreamUrl)}`;
   if (referer) w += `&ref=${b64url(referer)}`;
+  if (keyB64url) w += `&k=${keyB64url}`;
   return w;
 }
 
@@ -158,10 +157,24 @@ async function fetchViaWorker(url, referer) {
 }
 
 /**
+ * Upstream fetch for the English flow: worker first (dodges datacenter-IP
+ * blocks on Render), direct fetch as fallback (e.g. local PC backend).
+ */
+async function smartFetch(url, referer) {
+  try {
+    return await fetchViaWorker(url, referer);
+  } catch {
+    return fetch(url, {
+      headers: { ...H, ...(referer ? { Referer: referer } : {}) },
+    });
+  }
+}
+
+/**
  * Rewrite every URI in an HLS playlist to go through our worker proxy.
  * Idempotent: URLs the worker already rewrote are normalized (not double-wrapped).
  */
-export function rewritePlaylistViaWorker(text, playlistUrl, referer) {
+export function rewritePlaylistViaWorker(text, playlistUrl, referer, keyB64url) {
   const proxied = (raw) => {
     try {
       const abs = new URL(raw, playlistUrl).toString();
@@ -172,7 +185,13 @@ export function rewritePlaylistViaWorker(text, playlistUrl, referer) {
           if (d) target = unb64url(d) || abs;
         } catch { /* keep abs */ }
       }
-      return workerProxyUrl(target, referer);
+      // Nested playlists may be encrypted too — hand the worker the XOR key
+      // so it can decrypt them before rewriting. Segments/keys don't need it.
+      let k = null;
+      try {
+        if (keyB64url && new URL(target).pathname.toLowerCase().endsWith('.m3u8')) k = keyB64url;
+      } catch { /* keep k null */ }
+      return workerProxyUrl(target, referer, k);
     } catch {
       return raw;
     }
@@ -214,7 +233,7 @@ export function rewritePlaylist(text, playlistUrl, animeId, ep) {
 }
 
 async function fetchUpstream(url, referer) {
-  return fetch(url, { headers: { 'User-Agent': UA, Referer: referer } });
+  return smartFetch(url, referer);
 }
 
 /**
@@ -251,18 +270,15 @@ export async function resolveWatch(animeId, anilistId, ep, type) {
         apiBase: FLIX,
         headers: H,
         referer: `${REANIME}/`,
+        fetchImpl: (u, opts) =>
+          smartFetch(u, (opts && opts.headers && opts.headers.Referer) || `${REANIME}/`),
       });
       if (!stream.url) throw new Error('No stream URL extracted');
 
       // Validate + learn the audio tracks from the (possibly encrypted) master.
-      // Playlist bytes come through our worker (Cloudflare IP) so a blocked
-      // datacenter egress doesn't kill resolution; falls back to direct fetch.
-      let plRes = null;
-      try {
-        plRes = await fetchViaWorker(stream.url, `${FLIX}/`);
-      } catch {
-        plRes = await fetchUpstream(stream.url, `${FLIX}/`);
-      }
+      // Playlist bytes come through smartFetch (worker first) so a blocked
+      // datacenter egress doesn't kill resolution.
+      const plRes = await smartFetch(stream.url, `${FLIX}/`);
       if (!plRes.ok) throw new Error(`Playlist fetch ${plRes.status}`);
       let master = await plRes.text();
       const playlistKey = stream.playlist_key || stream.key || null;
@@ -274,7 +290,13 @@ export async function resolveWatch(animeId, anilistId, ep, type) {
       keyByStream.set(key, playlistKey || '');
       // Served to the player via /en/pl: decrypted, with every URI rewritten
       // to the worker proxy so playback never touches the blocked egress IP.
-      const masterForServe = rewritePlaylistViaWorker(master, stream.url, `${FLIX}/`);
+      // Nested (variant/audio) playlists may be encrypted as well — pass the
+      // XOR key along so the worker can decrypt them before rewriting.
+      const rawKey = stream.playlist_key || stream.key || null;
+      const keyB64url = rawKey
+        ? Buffer.from(rawKey, 'base64').toString('base64url')
+        : null;
+      const masterForServe = rewritePlaylistViaWorker(master, stream.url, `${FLIX}/`, keyB64url);
 
       const subtitles = (stream.subtitles || [])
         .filter((s) => s.url)

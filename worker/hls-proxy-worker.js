@@ -34,6 +34,38 @@ function b64encUrl(url) {
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+/** base64url -> raw bytes (for the XOR playlist key in ?k=). */
+function b64decBytes(s) {
+  s = String(s || '').replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  const bin = atob(s);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+/**
+ * XOR-decrypt a base64 ciphertext with key bytes (FlixCloud playlist
+ * encryption). Returns the plaintext string, or null on failure.
+ */
+function xorDecryptPlaylist(b64Text, keyBytes) {
+  try {
+    const bin = atob(String(b64Text || '').trim());
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) {
+      out[i] = bin.charCodeAt(i) ^ keyBytes[i % keyBytes.length];
+    }
+    let s = '';
+    const CH = 0x8000;
+    for (let i = 0; i < out.length; i += CH) {
+      s += String.fromCharCode.apply(null, out.subarray(i, i + CH));
+    }
+    return s;
+  } catch {
+    return null;
+  }
+}
+
 function corsHeaders(extra) {
   return Object.assign({
     'Access-Control-Allow-Origin': '*',
@@ -44,27 +76,28 @@ function corsHeaders(extra) {
 }
 
 // Rewrite one URI found inside a playlist (segment, nested playlist, key)
-function proxify(uri, baseUrl, selfUrl) {
+function proxify(uri, baseUrl, selfUrl, extra) {
   try {
     const abs = new URL(uri, baseUrl).toString();
-    return selfUrl + '?d=' + b64encUrl(abs);
+    return selfUrl + '?d=' + b64encUrl(abs) + (extra || '');
   } catch (e) {
     return uri;
   }
 }
 
-function rewritePlaylist(text, baseUrl, selfUrl) {
+function rewritePlaylist(text, baseUrl, selfUrl, extra) {
   const lines = text.split('\n');
   const out = lines.map(line => {
     const t = line.trim();
-    if (!t || t.startsWith('#')) {
-      // Rewrite EXT-X-KEY / EXT-X-MAP URI="..." attributes too
-      if (t.startsWith('#EXT-X-KEY') || t.startsWith('#EXT-X-MAP')) {
-        return line.replace(/URI="([^"]+)"/, (m, uri) => 'URI="' + proxify(uri, baseUrl, selfUrl) + '"');
+    if (!t) return line;
+    if (t.startsWith('#')) {
+      // Rewrite URI="..." attributes too (EXT-X-KEY, EXT-X-MAP, EXT-X-MEDIA)
+      if (t.includes('URI="')) {
+        return line.replace(/URI="([^"]+)"/g, (m, uri) => 'URI="' + proxify(uri, baseUrl, selfUrl, extra) + '"');
       }
       return line;
     }
-    return proxify(t, baseUrl, selfUrl);
+    return proxify(t, baseUrl, selfUrl, extra);
   });
   return out.join('\n');
 }
@@ -109,13 +142,34 @@ async function handleProxy(request, target) {
   if (cacheCtl) outHeaders['Cache-Control'] = cacheCtl;
 
   if (isPlaylist) {
-    const text = await upstream.text();
-    const rewritten = rewritePlaylist(text, target, selfBase);
-    outHeaders['Content-Type'] = 'application/vnd.apple.mpegurl';
-    return new Response(rewritten, { status: 200, headers: outHeaders });
+    let text = await upstream.text();
+    // Encrypted nested playlists: decrypt with ?k= before rewriting.
+    const reqParams = new URL(request.url).searchParams;
+    const keyParam = reqParams.get('k');
+    if (!text.trimStart().startsWith('#EXTM3U') && keyParam) {
+      const plain = xorDecryptPlaylist(text, b64decBytes(keyParam));
+      if (plain) text = plain;
+    }
+    if (text.trimStart().startsWith('#EXTM3U')) {
+      // Propagate ref + key so deeper levels (segments, nested playlists)
+      // are fetched with the right Referer and can be decrypted.
+      const refVal = reqParams.get('ref');
+      const keyVal = reqParams.get('k');
+      let extra = '';
+      if (refVal) extra += '&ref=' + refVal;
+      if (keyVal) extra += '&k=' + keyVal;
+      const rewritten = rewritePlaylist(text, target, selfBase, extra);
+      outHeaders['Content-Type'] = 'application/vnd.apple.mpegurl';
+      return new Response(rewritten, { status: 200, headers: outHeaders });
+    }
+    // Not actually a playlist (e.g. undecryptable ciphertext) — pass through
+    // untouched so the caller sees the real bytes.
+    const ptCt = upstream.headers.get('Content-Type');
+    if (ptCt) outHeaders['Content-Type'] = ptCt;
+    return new Response(text, { status: upstream.status, headers: outHeaders });
   }
 
-  // Segments / keys / mp4: stream bytes through untouched
+  // Segments / keys / mp4 / subtitles: stream bytes through untouched
   const passCt = upstream.headers.get('Content-Type');
   if (passCt) outHeaders['Content-Type'] = passCt;
   const cr = upstream.headers.get('Content-Range');
