@@ -259,7 +259,7 @@
   }
   // Staged: paints EN badges as soon as ready, re-paints when Hindi resolves.
   function checkEpisodeStaged(ctx, n, cb) {
-    var avail = { sub: false, dub: false, hindi: false, servers: [] };
+    var avail = { sub: false, dub: false, hindi: false, hindi2: false, servers: [] };
     var jobs = [];
     if (ctx.anilistId) {
       jobs.push(enServers(ctx.anilistId, n).then(function (ss) {
@@ -274,6 +274,12 @@
         avail.hindi = !!h;
         cb(avail);
       }));
+    }
+    if (ctx.title && typeof window.cdHasEpisode === 'function') {
+      jobs.push(window.cdHasEpisode(ctx.title, n).then(function (h) {
+        avail.hindi2 = !!h;
+        cb(avail);
+      }, function () { cb(avail); }));
     }
     return Promise.all(jobs).then(function () { return avail; });
   }
@@ -298,11 +304,12 @@
     if (openDlg && openDlg.n === n) { try { openDlg.refresh(); } catch (e) {} }
     var old = card.querySelector('.st-badges'); if (old) old.remove();
     var oldG = card.querySelector('.st-globe'); if (oldG) oldG.remove();
-    if (!avail.sub && !avail.dub && !avail.hindi) return;
+    if (!avail.sub && !avail.dub && !avail.hindi && !avail.hindi2) return;
     var tags = '';
     if (avail.sub) tags += '<i class="st-b st-sub">SUB</i>';
     if (avail.dub) tags += '<i class="st-b st-dub">DUB</i>';
     if (avail.hindi) tags += '<i class="st-b st-hi">HINDI</i>';
+    if (avail.hindi2 && !avail.hindi) tags += '<i class="st-b st-hi">HINDI</i>';
     var badges = document.createElement('span');
     badges.className = 'st-badges';
     badges.innerHTML = tags;
@@ -522,16 +529,18 @@
       if (s.dataType === 'dub') seen[nm].dub = true;
     });
     if (avail.hindi) out.push({ kind: 'hi', name: 'Hindi', langs: ['Hindi'] });
+    if (avail.hindi2) out.push({ kind: 'hi2', name: 'Hindi-2', langs: ['Hindi'] });
     return out;
   }
   function providerDesc(p) {
     if (p.kind === 'hi') return 'Hindi dub · ToonStream';
+    if (p.kind === 'hi2') return 'Hindi dub · Rare Animes';
     var bits = [];
     if (p.sub) bits.push('sub'); if (p.dub) bits.push('dub');
     return 'English ' + (bits.join(' & ') || 'stream') + ' · FlixCloud';
   }
   function providerLangs(p) {
-    if (p.kind === 'hi') return ['Hindi'];
+    if (p.kind === 'hi' || p.kind === 'hi2') return ['Hindi'];
     var l = [];
     if (p.sub) l.push('Japanese');
     if (p.dub) l.push('English');
@@ -656,6 +665,12 @@
       if (prov.kind === 'hi') {
         return hindiWatch(ctx.title, n).then(function (w) {
           return { url: w.stream, audioTracks: [], subtitles: [], providerLabel: 'Hindi · ToonStream' };
+        });
+      }
+      if (prov.kind === 'hi2') {
+        return window.cdWatchEp(ctx.title, n).then(function (w) {
+          return { url: w.stream, audioTracks: [], subtitles: [],
+            providerLabel: 'Hindi-2 · Rare Animes', referer: w._referer };
         });
       }
       return enReanimeId(ctx.anilistId, ctx.title).then(function (animeId) {
@@ -813,7 +828,14 @@
     }
 
     if (window.Hls && window.Hls.isSupported()) {
-      var hls = new window.Hls({ maxBufferLength: 30 });
+      var hlsCfg = { maxBufferLength: 30 };
+      // Hindi-2 (codedew): CDN needs the embed-page Referer on every
+      // request — use the fetch-based loader from the provider.
+      if (track && track.prov && track.prov.kind === 'hi2' &&
+          typeof window.cdHlsConfig === 'function' && s.referer) {
+        try { hlsCfg = window.cdHlsConfig(s.referer); } catch (e) {}
+      }
+      var hls = new window.Hls(hlsCfg);
       playerHls = hls;
       hls.on(window.Hls.Events.AUDIO_TRACKS_UPDATED, function (_, data) {
         buildAudioMenu(audioTracksFromHls(data.audioTracks));
