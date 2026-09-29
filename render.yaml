@@ -1,0 +1,5 @@
+services:
+  - type: web
+    name: media-player-v2
+    runtime: docker
+    plan: free

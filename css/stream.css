@@ -1,0 +1,84 @@
+/* Media Player V2 — streaming services UI (badges, provider dialog, player) */
+
+.st-badges{position:absolute; top:36px; left:10px; z-index:3; display:flex; gap:4px; pointer-events:none}
+.st-b{font-size:9px; font-weight:800; letter-spacing:.5px; padding:2px 6px; border-radius:5px;
+  color:#fff; background:rgba(8,8,12,.55); border:1px solid rgba(255,255,255,.28);
+  -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px)}
+.st-b.st-sub{border-color:rgba(96,165,250,.7)}
+.st-b.st-dub{border-color:rgba(192,132,252,.7)}
+.st-b.st-hi{border-color:rgba(251,191,36,.7)}
+.episode-action.st-globe{background:rgba(20,60,120,.72); border-color:rgba(96,165,250,.65);
+  box-shadow:0 0 10px rgba(96,165,250,.35)}
+
+/* Choose Provider dialog */
+.st-scrim{position:fixed; inset:0; z-index:900; display:flex; align-items:flex-end; justify-content:center;
+  background:rgba(0,0,0,.62); -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px); padding:18px}
+.st-dialog{position:relative; width:min(480px,100%); max-height:82vh; overflow:auto;
+  background:rgba(14,14,20,.96); border:1px solid rgba(255,255,255,.12); border-radius:20px;
+  padding:22px 18px 18px; box-shadow:0 24px 60px rgba(0,0,0,.6)}
+.st-dialog h3{margin:0 0 4px; font-size:19px; font-weight:800; color:#fff}
+.st-dialog .st-sub{margin:0 0 16px; font-size:13px; color:rgba(255,255,255,.55)}
+.st-x{position:absolute; top:10px; right:10px; width:32px; height:32px; border-radius:50%;
+  border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.06); color:#fff; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center}
+.st-x .icon{width:14px; height:14px}
+.st-provs{display:flex; flex-direction:column; gap:10px; margin-bottom:14px}
+.st-prov{display:flex; align-items:center; gap:12px; width:100%; text-align:left; cursor:pointer;
+  padding:12px 14px; border-radius:14px; color:#fff; font:inherit;
+  background:rgba(255,255,255,.045); border:1px solid rgba(255,255,255,.1)}
+.st-prov.sel{background:rgba(96,165,250,.14); border-color:rgba(96,165,250,.65);
+  box-shadow:0 0 14px rgba(96,165,250,.25)}
+.st-prov-ic{width:36px; height:36px; flex:none; border-radius:10px; display:inline-flex;
+  align-items:center; justify-content:center; background:rgba(255,255,255,.07)}
+.st-prov-ic .icon{width:18px; height:18px}
+.st-prov-tx{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px}
+.st-prov-tx b{font-size:14px; font-weight:800}
+.st-prov-tx i{font-style:normal; font-size:12px; color:rgba(255,255,255,.55)}
+.st-prov-go{flex:none; width:30px; height:30px; display:inline-flex; align-items:center; justify-content:center;
+  color:rgba(255,255,255,.6)}
+.st-prov-go .icon{width:17px; height:17px}
+.st-langwrap{margin-bottom:14px}
+.st-langlabel{font-size:12px; font-weight:700; letter-spacing:.6px; text-transform:uppercase;
+  color:rgba(255,255,255,.5); margin-bottom:8px}
+.st-langs{display:flex; gap:8px; flex-wrap:wrap}
+.st-lang{padding:8px 16px; border-radius:999px; font:inherit; font-size:13px; font-weight:700; cursor:pointer;
+  color:#fff; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.14)}
+.st-lang.sel{background:rgba(96,165,250,.2); border-color:rgba(96,165,250,.7)}
+.st-start{width:100%; padding:13px; border:0; border-radius:14px; font:inherit; font-size:15px; font-weight:800;
+  color:#fff; background:linear-gradient(135deg,#2563eb,#7c3aed); cursor:pointer}
+.st-start:disabled{opacity:.45; cursor:default}
+@media(min-width:640px){.st-scrim{align-items:center}}
+
+/* In-app player */
+.st-player{position:fixed; inset:0; z-index:950; background:#000; display:flex; flex-direction:column}
+.st-p-top{display:flex; align-items:center; gap:10px; padding:calc(10px + env(safe-area-inset-top)) 12px 10px;
+  background:linear-gradient(rgba(0,0,0,.75),transparent); position:absolute; top:0; left:0; right:0; z-index:2}
+.st-p-title{flex:1; min-width:0; display:flex; flex-direction:column}
+.st-p-title b{color:#fff; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.st-p-title i{font-style:normal; color:rgba(255,255,255,.6); font-size:11px}
+.st-p-btn{border:1px solid rgba(255,255,255,.2); background:rgba(255,255,255,.08); color:#fff;
+  border-radius:999px; padding:7px 14px; font:inherit; font-size:12px; font-weight:700; cursor:pointer;
+  display:inline-flex; align-items:center; gap:6px}
+.st-p-btn .icon{width:14px; height:14px}
+.st-p-video{flex:1; width:100%; min-height:0; background:#000}
+.st-p-loading{position:absolute; inset:0; display:flex; flex-direction:column; gap:12px;
+  align-items:center; justify-content:center; background:rgba(0,0,0,.55); z-index:3}
+.st-p-loading i{font-style:normal; color:rgba(255,255,255,.7); font-size:13px}
+.st-p-spin{width:38px; height:38px; border-radius:50%; border:3px solid rgba(255,255,255,.2);
+  border-top-color:#fff; animation:stspin 0.9s linear infinite}
+@keyframes stspin{to{transform:rotate(360deg)}}
+.st-p-error{position:absolute; inset:0; display:flex; flex-direction:column; gap:8px;
+  align-items:center; justify-content:center; background:rgba(0,0,0,.7); z-index:3; padding:24px; text-align:center}
+.st-p-error b{color:#fff; font-size:16px}
+.st-p-error p{color:rgba(255,255,255,.65); font-size:13px; margin:0 0 8px; max-width:320px}
+.st-p-retry{border:0; border-radius:12px; padding:11px 26px; font:inherit; font-weight:800; color:#fff;
+  background:linear-gradient(135deg,#2563eb,#7c3aed); cursor:pointer}
+.st-p-menu{position:absolute; top:calc(56px + env(safe-area-inset-top)); right:12px; z-index:4;
+  min-width:190px; background:rgba(16,16,24,.97); border:1px solid rgba(255,255,255,.14);
+  border-radius:14px; padding:8px; display:flex; flex-direction:column; gap:2px}
+.st-p-menu b{font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:rgba(255,255,255,.5);
+  padding:6px 10px 4px}
+.st-p-menu button{border:0; background:none; color:#fff; font:inherit; font-size:13px; text-align:left;
+  padding:9px 10px; border-radius:9px; cursor:pointer}
+.st-p-menu button.sel{background:rgba(96,165,250,.2); color:#bfdbfe}
+.hidden{display:none !important}

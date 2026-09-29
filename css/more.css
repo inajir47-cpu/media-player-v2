@@ -1,0 +1,299 @@
+/* ==========================================================================
+   CHUNK 2: MORE full-details modal (design-phase demo metadata).
+   Faithful port of the preview's more-modal: bottom-anchored glass sheet,
+   launch & release grid, full synopsis, cast cards, ratings & reviews.
+   --detail-accent carries the detail page's chameleon poster color.
+   ========================================================================== */
+
+/* MORE pill button on the detail page (after the short synopsis). */
+.more-btn-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+.more-button {
+  min-height: 27px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(78, 78, 84, 0.94);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.13);
+  cursor: pointer;
+}
+.more-button:hover { background: rgba(98, 98, 104, 0.94); }
+.more-button:focus-visible { outline: 2px solid var(--tone, #fff); outline-offset: 2px; }
+
+/* Modal veil + sheet. */
+.more-modal {
+  --detail-accent: var(--tone, #ff6a1a);
+  position: fixed;
+  inset: 0;
+  z-index: 230;
+  display: grid;
+  place-items: end center;
+  padding: clamp(12px, 2.5vw, 30px);
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(24px) saturate(120%);
+  -webkit-backdrop-filter: blur(24px) saturate(120%);
+  animation: modalVeilIn 280ms var(--motion-glide, ease-out) both;
+}
+@keyframes modalVeilIn { from { opacity: 0; } to { opacity: 1; } }
+.more-sheet {
+  position: relative;
+  width: min(1050px, 100%);
+  max-height: min(880px, calc(100dvh - clamp(24px, 5vw, 60px)));
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 0;
+  border-radius: 30px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.11), transparent 28%),
+    linear-gradient(320deg, color-mix(in srgb, var(--detail-accent) 10%, transparent), transparent 60%),
+    rgba(12, 12, 15, 0.92);
+  border: 1px solid color-mix(in srgb, var(--detail-accent) 20%, rgba(255, 255, 255, 0.1));
+  box-shadow: 0 40px 130px rgba(0, 0, 0, 0.82), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(34px) saturate(145%);
+  -webkit-backdrop-filter: blur(34px) saturate(145%);
+  animation: moreSheetIn 520ms var(--motion-spring, cubic-bezier(0.2, 0.9, 0.25, 1.2)) both;
+  scrollbar-width: thin;
+}
+@keyframes moreSheetIn {
+  from { opacity: 0; transform: translateY(42px) scale(0.975); filter: blur(10px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+.more-close {
+  position: sticky;
+  z-index: 4;
+  top: 16px;
+  float: right;
+  margin: 16px 16px 0 0;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  cursor: pointer;
+}
+.more-close:hover { background: rgba(255, 255, 255, 0.21); }
+.more-content {
+  clear: both;
+  padding: 8px clamp(22px, 5vw, 64px) clamp(34px, 6vw, 72px);
+  color: #f8f7f2;
+}
+.more-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+.more-eyebrow::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--detail-accent);
+  box-shadow: 0 0 20px var(--detail-accent);
+}
+.more-content > h2 {
+  font-family: var(--font-serif);
+  font-size: clamp(42px, 7vw, 78px);
+  line-height: 0.95;
+  letter-spacing: -0.035em;
+  margin: 12px 0 34px;
+  max-width: 760px;
+}
+.more-block { padding: 30px 0; }
+.more-block + .more-block { border-top: 1px solid rgba(255, 255, 255, 0.09); }
+.more-block h3 {
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.58);
+  margin: 0 0 18px;
+}
+
+/* Launch & release grid. */
+.release-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px;
+}
+.release-item span {
+  display: block;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.release-item strong {
+  display: block;
+  font-size: clamp(17px, 2.3vw, 23px);
+  line-height: 1.2;
+}
+
+/* Full synopsis. */
+.full-synopsis {
+  font-family: var(--font-serif);
+  font-size: clamp(20px, 2.7vw, 29px);
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+  max-width: 850px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+/* Cast inside the modal reuses .cast-list / .cast-card from pages.css. */
+.more-block .cast-heading {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--detail-accent);
+  margin: 25px 0 12px;
+}
+.more-block .cast-heading:first-of-type { margin-top: 0; }
+.more-block .cast-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 34px;
+}
+
+/* Ratings & reviews. */
+.ratings-layout {
+  display: grid;
+  grid-template-columns: minmax(230px, 0.72fr) minmax(0, 1.28fr);
+  gap: clamp(28px, 5vw, 70px);
+}
+.community-score {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.community-score strong {
+  font-family: var(--font-serif);
+  font-size: 68px;
+  line-height: 0.78;
+  color: var(--detail-accent);
+}
+.community-score span {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.rating-bars { display: grid; gap: 8px; }
+.rating-bar {
+  display: grid;
+  grid-template-columns: 22px 1fr 34px;
+  gap: 9px;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 11px;
+}
+.rating-track {
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+.rating-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--detail-accent);
+}
+.review-entries { display: grid; gap: 26px; align-content: start; }
+.popup-review strong { font-size: 14px; }
+.popup-review .review-stars {
+  color: var(--detail-accent);
+  font-size: 11px;
+  font-weight: 800;
+  margin-left: 8px;
+}
+.popup-review p {
+  margin: 8px 0 0;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 15px;
+  line-height: 1.55;
+}
+.more-block .demo-note {
+  margin-top: 18px;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 12px;
+}
+
+/* Cast profile sits above the MORE modal when opened from inside it. */
+.cast-profile-veil { z-index: 240; }
+
+/* Mobile: full-bleed bottom sheet. */
+@media (max-width: 700px) {
+  .more-modal { padding: 0; align-items: end; }
+  .more-sheet { max-height: 94dvh; border-radius: 25px 25px 0 0; }
+  .more-content { padding: 4px 20px 38px; }
+  .more-content > h2 { font-size: 43px; margin: 10px 0 24px; }
+  .more-block { padding: 24px 0; }
+  .release-grid { grid-template-columns: 1fr; gap: 18px; }
+  .more-block .cast-list { grid-template-columns: 1fr; }
+  .ratings-layout { grid-template-columns: 1fr; }
+  .popup-review p { font-size: 18px; }
+}
+
+/* Reduced motion: no veil/sheet entrance animation. */
+@media (prefers-reduced-motion: reduce) {
+  .more-modal, .more-sheet { animation: none; }
+}
+
+/* Rating details modal (opened from the ★ on a detail page). */
+.rating-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: #f5b50a;
+  font-weight: 800;
+  font-size: inherit;
+  cursor: pointer;
+}
+.rating-link:hover { text-decoration: underline; }
+.rating-sheet { padding: clamp(20px, 4vw, 36px); text-align: center; }
+.rating-kicker {
+  font-size: 11px;
+  letter-spacing: .18em;
+  color: var(--muted);
+  margin: 0 0 6px;
+}
+.rating-head h2 { margin: 0 0 14px; font-size: 22px; }
+.rating-score { display: flex; align-items: baseline; justify-content: center; gap: 4px; }
+.rating-big { font-size: 56px; font-weight: 800; color: #f5b50a; line-height: 1; }
+.rating-of { color: var(--muted); font-size: 18px; }
+.rating-stars { margin: 10px 0 4px; font-size: 26px; letter-spacing: 4px; }
+.rstar { color: rgba(255,255,255,.18); }
+.rstar.on { color: #f5b50a; }
+.rating-votes { color: var(--muted); font-size: 13px; margin: 0 0 18px; }
+.rbar-list { max-width: 420px; margin: 0 auto; text-align: left; }
+.rbar-row { display: flex; align-items: center; gap: 10px; margin: 7px 0; }
+.rbar-star { width: 14px; text-align: right; font-size: 13px; color: var(--muted); }
+.rbar-track {
+  flex: 1;
+  height: 8px;
+  border-radius: 6px;
+  background: rgba(255,255,255,.08);
+  overflow: hidden;
+}
+.rbar-fill {
+  height: 100%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #f5b50a, #ff8a3d);
+}
+.rbar-pct { width: 40px; font-size: 12px; color: var(--muted); text-align: right; }
+.rating-runtime { margin: 18px 0 0; color: var(--muted); font-size: 14px; }

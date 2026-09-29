@@ -1,0 +1,118 @@
+/* ============ STEP 7 · CHUNK 1 — navigation motion ============
+ * Landing card expand → "Opening…" skeleton screen → section;
+ * poster → detail ghost; directional tab slides; close-to-landing fade.
+ * Ported from the hosted preview's motion system.
+ */
+:root{
+  --motion-spring:cubic-bezier(.22,.78,.18,1);
+  --motion-glide:cubic-bezier(.32,.72,0,1);
+  --sk-base:#111115;
+  --sk-mid:#1a1a20;
+  --sk-shine:#2b2b33;
+}
+:root[data-theme="light"]{
+  --sk-base:#e6e9ef;
+  --sk-mid:#dce0e8;
+  --sk-shine:#f6f7fa;
+}
+
+/* Expanding landing-card clone */
+.transition-choice-clone{
+  position:fixed!important; z-index:201!important; margin:0!important;
+  pointer-events:none!important; transform-origin:0 0!important;
+  will-change:transform,border-radius,filter,opacity;
+  box-shadow:0 36px 120px rgba(0,0,0,.8)!important;
+}
+.transition-choice-clone .arrow{opacity:0}
+.transition-choice-clone .choice-content,
+.transition-choice-clone .index,
+.transition-choice-clone .choice-art{will-change:opacity,transform}
+
+/* "Opening <Section>" skeleton screen */
+.opening-screen{
+  position:fixed; z-index:202; inset:0; overflow:hidden;
+  background:var(--bg); color:var(--text);
+  opacity:0; pointer-events:none;
+  transition:opacity 260ms var(--motion-glide);
+}
+.opening-screen.is-visible{opacity:1}
+.opening-screen.is-resolving{opacity:0; transition-duration:360ms}
+.opening-screen-inner{
+  width:100%; min-height:100%; padding:0; display:block;
+  transform:scale(.992); opacity:0;
+  transition:transform 420ms var(--motion-spring),opacity 320ms ease;
+}
+.opening-screen.is-visible .opening-screen-inner{transform:none; opacity:1}
+.opening-screen .shell{min-height:100dvh}
+.opening-screen img{opacity:0!important}
+/* Skeletonize text + blocks, keep layout identical to the real home */
+.opening-screen .section-switch,
+.opening-screen .nav-item,
+.opening-screen .icon-btn,
+.opening-screen .section-tag,
+.opening-screen .page-head h1,
+.opening-screen .page-head p,
+.opening-screen .hero-copy .label,
+.opening-screen .hero-copy h2,
+.opening-screen .hero-copy p,
+.opening-screen .row-head h2,
+.opening-screen .muted-link,
+.opening-screen .poster-card,
+.opening-screen .poster-title,
+.opening-screen .poster-meta{
+  position:relative; overflow:hidden;
+  color:transparent!important; background:var(--sk-base)!important;
+  border-color:transparent!important; box-shadow:none!important; text-shadow:none!important;
+}
+.opening-screen .poster-img{background:var(--sk-base); position:relative; overflow:hidden}
+.opening-screen .section-switch::after,
+.opening-screen .nav-item::after,
+.opening-screen .icon-btn::after,
+.opening-screen .section-tag::after,
+.opening-screen .page-head h1::after,
+.opening-screen .page-head p::after,
+.opening-screen .hero-copy .label::after,
+.opening-screen .hero-copy h2::after,
+.opening-screen .hero-copy p::after,
+.opening-screen .row-head h2::after,
+.opening-screen .muted-link::after,
+.opening-screen .poster-card::after,
+.opening-screen .poster-title::after,
+.opening-screen .poster-meta::after,
+.opening-screen .poster-img::after{
+  content:""; position:absolute; z-index:8; inset:0;
+  background:linear-gradient(102deg,transparent 18%,var(--sk-mid) 40%,var(--sk-shine) 50%,var(--sk-mid) 60%,transparent 82%);
+  transform:translateX(-110%);
+  animation:skeletonShimmer 1.35s cubic-bezier(.4,0,.2,1) infinite;
+}
+.opening-screen .hero{background:var(--sk-base); border:0}
+@keyframes skeletonShimmer{to{transform:translateX(110%)}}
+
+/* Poster → detail ghost */
+.route-veil{
+  position:fixed; z-index:198; inset:0;
+  background:rgba(0,0,0,.72);
+  backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+  opacity:0; pointer-events:none; will-change:opacity;
+}
+.detail-transition-ghost{
+  position:fixed; z-index:199; object-fit:cover; border-radius:14px;
+  box-shadow:0 30px 90px rgba(0,0,0,.72);
+  pointer-events:none; will-change:left,top,width,height,border-radius,transform,opacity;
+}
+.view-motion-stage{transform-origin:50% 36%; will-change:transform,opacity,filter}
+
+/* Tactile press feedback */
+.motion-pressed{transform:scale(.975)!important; filter:brightness(.93); transition-duration:110ms!important}
+
+/* Reduced motion: kill every motion-layer animation */
+body.reduced .transition-choice-clone,
+body.reduced .opening-screen,
+body.reduced .route-veil,
+body.reduced .detail-transition-ghost,
+body.reduced .view-motion-stage,
+body.reduced .motion-pressed{animation:none!important; transition:none!important}
+@media (prefers-reduced-motion:reduce){
+  .transition-choice-clone,.opening-screen,.route-veil,
+  .detail-transition-ghost,.view-motion-stage,.motion-pressed{animation:none!important; transition:none!important}
+}
