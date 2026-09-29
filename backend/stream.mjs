@@ -344,3 +344,105 @@ export function getCachedMaster(animeId, ep) {
 export function invalidateStream(animeId, ep) {
   streamCache.delete(cacheKey(animeId, ep));
 }
+
+/* ------------------------------------------------------------------
+ * Hindi-2 (Rare Animes India via JuicyCodes CDN).
+ *
+ * Why the backend and not the Cloudflare Worker: the CDN signs stream
+ * URLs against the IP that loaded the embed page. The worker fetches the
+ * embed page over IPv6, but the stream host (*.groovy.monster) is
+ * IPv4-only — so the worker can never present the same IP when fetching
+ * the playlist ("Invalid signature", endless loading). The backend uses
+ * one stable IPv4 egress for the embed page, playlists and segments, so
+ * the signature validates. Search/episode discovery still runs in the
+ * phone's browser through the worker (codedew.com blocks datacenter IPs);
+ * only the fileId crosses over to the backend.
+ * ------------------------------------------------------------------ */
+
+const HI2_EMBED_HOST = 'https://argon.razorshell.space';
+
+export function hi2EmbedUrl(fid) {
+  return `${HI2_EMBED_HOST}/embed/${fid}`;
+}
+
+const JUICY_ALPHABET = ['`', '%', '-', '+', '*', '$', '!', '_', '^', '='];
+
+function hi2JuicyDecode(payload) {
+  const tail = payload.slice(-3);
+  let saltStr = '';
+  for (let i = 0; i < 3; i++) saltStr += String(tail.charCodeAt(i) - 100);
+  const salt = parseInt(saltStr, 10);
+  let b64 = payload.slice(0, -3).replace(/_/g, '+').replace(/-/g, '/');
+  while (b64.length % 4) b64 += '=';
+  const bin = Buffer.from(b64, 'base64').toString('latin1');
+  let digits = '';
+  for (let j = 0; j < bin.length; j++) {
+    const idx = JUICY_ALPHABET.indexOf(bin.charAt(j));
+    if (idx < 0) throw new Error('juicy: bad alphabet char');
+    digits += String(idx);
+  }
+  let out = '';
+  for (let k = 0; k + 4 <= digits.length; k += 4) {
+    out += String.fromCharCode((parseInt(digits.substr(k, 4), 10) % 1000) - salt);
+  }
+  return out;
+}
+
+function hi2JuicyExtract(html) {
+  const re = /_juicycodes\(\s*((?:"[^"]*"\s*\+?\s*)+)\)/g;
+  const out = [];
+  let m;
+  while ((m = re.exec(html)) !== null) {
+    let payload = '';
+    const litRe = /"([^"]*)"/g;
+    let lm;
+    while ((lm = litRe.exec(m[1])) !== null) payload += lm[1].replace(/\\\//g, '/');
+    if (payload) {
+      try { out.push(hi2JuicyDecode(payload)); } catch { /* skip bad payload */ }
+    }
+  }
+  return out;
+}
+
+/**
+ * Resolve a Hindi-2 fileId to its upstream master playlist URL.
+ * Must be called from this backend — the returned URLs are signed for
+ * this machine's egress IP.
+ */
+export async function hi2ResolveMaster(fid) {
+  const embedUrl = hi2EmbedUrl(fid);
+  const er = await fetch(embedUrl, { headers: { 'User-Agent': UA } });
+  if (!er.ok) throw new Error(`Embed page ${er.status}`);
+  const html = await er.text();
+  let masterUrl = null;
+  for (const d of hi2JuicyExtract(html)) {
+    const clean = d.replace(/\\\//g, '/');
+    const m = clean.match(/https?:\/\/[^"'\\\s]+\.m3u8[^"'\\\s]*/);
+    if (m) { masterUrl = m[0]; break; }
+  }
+  if (!masterUrl) throw new Error('No stream URL in embed page');
+  return { embedUrl, masterUrl };
+}
+
+/** Rewrite every URI in an HLS playlist via mapUri(absoluteUrl). */
+export function hi2RewritePlaylist(text, playlistUrl, mapUri) {
+  return text
+    .split('\n')
+    .map((line) => {
+      const t = line.trim();
+      if (!t) return line;
+      if (t.startsWith('#')) {
+        return line.replace(/URI="([^"]+)"/g, (_m, uri) => {
+          try { return `URI="${mapUri(new URL(uri, playlistUrl).toString())}"`; }
+          catch { return _m; }
+        });
+      }
+      try { return mapUri(new URL(t, playlistUrl).toString()); }
+      catch { return line; }
+    })
+    .join('\n');
+}
+
+export function hi2IsFid(s) {
+  return /^[A-Za-z0-9_-]{4,64}$/.test(String(s || ''));
+}

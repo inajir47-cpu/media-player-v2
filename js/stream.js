@@ -678,9 +678,15 @@
         });
       }
       if (prov.kind === 'hi2') {
-        return window.cdWatchEp(ctx.title, n).then(function (w) {
-          return { url: w.stream, audioTracks: [], subtitles: [],
-            providerLabel: 'Hindi-2 · Rare Animes', referer: w._referer };
+        // Hindi-2: the phone discovers the embed fileId (search/episodes via
+        // the worker), then the backend resolves + proxies the stream from
+        // its own egress IP — the CDN's signature requires the embed page
+        // and playlist to come from the same IP, which the worker cannot do.
+        return window.cdResolveFileId(ctx.title, n).then(function (r) {
+          return { url: location.origin + '/api/stream/hi2/pl?fid=' +
+              encodeURIComponent(r.fileId),
+            audioTracks: [], subtitles: [],
+            providerLabel: 'Hindi-2 · Rare Animes' };
         });
       }
       if (prov.kind === 'za') {
@@ -861,12 +867,6 @@
 
     if (window.Hls && window.Hls.isSupported()) {
       var hlsCfg = { maxBufferLength: 30 };
-      // Hindi-2 (codedew): CDN needs the embed-page Referer on every
-      // request — use the fetch-based loader from the provider.
-      if (track && track.prov && track.prov.kind === 'hi2' &&
-          typeof window.cdHlsConfig === 'function' && s.referer) {
-        try { hlsCfg = window.cdHlsConfig(s.referer); } catch (e) {}
-      }
       var hls = new window.Hls(hlsCfg);
       playerHls = hls;
       hls.on(window.Hls.Events.AUDIO_TRACKS_UPDATED, function (_, data) {

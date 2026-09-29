@@ -343,6 +343,31 @@ function cdHasEpisode(title, n) {
   });
 }
 
+/* Resolve to the embed fileId only (no stream extraction). The fileId is
+   handed to the backend (/api/stream/hi2/pl), which resolves + proxies the
+   stream from its own egress IP — the CDN's signature requires the embed
+   page and the playlist to be fetched from the same IP, which the
+   Cloudflare Worker cannot satisfy (IPv6 vs IPv4-only stream host). */
+function cdResolveFileId(title, n) {
+  return cdMatches(title).then(function (ms) {
+    if (!ms.length) throw new Error('Hindi-2 source not found for this title');
+    var i = 0;
+    function next() {
+      if (i >= ms.length) throw new Error('This episode has no Hindi-2 stream');
+      var m = ms[i++];
+      return cdEpisodes(m.href).then(function (eps) {
+        var e = null;
+        for (var j = 0; j < eps.length; j++) {
+          if (eps[j].number === n) { e = eps[j]; break; }
+        }
+        if (!e) return next();
+        return cdResolveToken(e.url);
+      }, function () { return next(); });
+    }
+    return next();
+  });
+}
+
 function cdWatchEp(title, n) {
   return cdMatches(title).then(function (ms) {
     if (!ms.length) throw new Error('Hindi-2 source not found for this title');
@@ -370,6 +395,7 @@ function cdWatchEp(title, n) {
 window.cdSearch = cdSearch;
 window.cdDetail = cdEpisodes;
 window.cdWatchEp = cdWatchEp;
+window.cdResolveFileId = cdResolveFileId;
 window.cdHasEpisode = cdHasEpisode;
 window.cdHlsConfig = cdHlsConfig;
 window.CD_JUICY = { decode: juicyDecode, extract: juicyExtract };

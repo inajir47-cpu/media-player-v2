@@ -14,6 +14,10 @@ import {
   invalidateStream,
   unb64url,
   b64url,
+  hi2ResolveMaster,
+  hi2RewritePlaylist,
+  hi2EmbedUrl,
+  hi2IsFid,
 } from './stream.mjs';
 
 const router = Router();
@@ -192,5 +196,77 @@ async function handleProxy(req, res) {
 
 router.get('/r', handleProxy);
 router.post('/r', handleProxy);
+
+/* ------------------------------------------------------------------
+ * Hindi-2 (Rare Animes India) — same-IP stream proxying.
+ * The JuicyCodes CDN binds stream signatures to the IP that loaded the
+ * embed page; the Cloudflare Worker can't satisfy that (IPv6 embed fetch
+ * vs IPv4-only stream host), so the backend resolves and serves here.
+ * The phone discovers the fileId itself (search/episodes via the worker)
+ * and hands it over; playback then stays on this backend's egress IP.
+ * ------------------------------------------------------------------ */
+
+function hi2PlaylistHeaders(res) {
+  res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+}
+
+// GET /api/stream/hi2/pl?fid=<fileId> — master playlist, variants rewritten
+// to /hi2/v below.
+router.get('/hi2/pl', async (req, res) => {
+  const fid = String(req.query.fid || '');
+  if (!hi2IsFid(fid)) return res.status(400).json({ error: 'fid is required' });
+  try {
+    const { embedUrl, masterUrl } = await hi2ResolveMaster(fid);
+    const mr = await fetch(masterUrl, {
+      headers: { 'User-Agent': UPSTREAM_UA, Referer: embedUrl },
+    });
+    if (!mr.ok) return res.status(502).json({ error: `Playlist ${mr.status}` });
+    const master = await mr.text();
+    if (!master.trimStart().startsWith('#EXTM3U')) {
+      return res.status(502).json({ error: 'Upstream did not return a playlist' });
+    }
+    const out = hi2RewritePlaylist(master, masterUrl, (abs) => {
+      const p = new URLSearchParams({ fid, u: b64url(abs) });
+      return `/api/stream/hi2/v?${p.toString()}`;
+    });
+    hi2PlaylistHeaders(res);
+    return res.send(out);
+  } catch (e) {
+    return res.status(502).json({ error: e?.message || 'Hindi-2 resolve failed' });
+  }
+});
+
+// GET /api/stream/hi2/v?fid=<fileId>&u=<b64url> — variant (or nested)
+// playlist; media segments rewritten to the generic /r proxy with the
+// embed-page Referer the CDN requires.
+router.get('/hi2/v', async (req, res) => {
+  const fid = String(req.query.fid || '');
+  const upstream = unb64url(String(req.query.u || ''));
+  if (!hi2IsFid(fid) || !upstream) {
+    return res.status(400).json({ error: 'fid and u are required' });
+  }
+  try {
+    const embedUrl = hi2EmbedUrl(fid);
+    const vr = await fetch(upstream, {
+      headers: { 'User-Agent': UPSTREAM_UA, Referer: embedUrl },
+    });
+    if (!vr.ok) return res.status(502).json({ error: `Variant ${vr.status}` });
+    const text = await vr.text();
+    const out = hi2RewritePlaylist(text, upstream, (abs) => {
+      if (/\.m3u8(\?|$)/i.test(abs.split('?')[0])) {
+        const p = new URLSearchParams({ fid, u: b64url(abs) });
+        return `/api/stream/hi2/v?${p.toString()}`;
+      }
+      const p = new URLSearchParams({ u: b64url(abs), xreferer: embedUrl });
+      return `/api/stream/r?${p.toString()}`;
+    });
+    hi2PlaylistHeaders(res);
+    return res.send(out);
+  } catch (e) {
+    return res.status(502).json({ error: e?.message || 'Hindi-2 variant failed' });
+  }
+});
 
 export default router;
