@@ -6,6 +6,10 @@ import { extractFlixcloud } from './flixcloud.mjs';
 
 const REANIME = 'https://reanime.to';
 const FLIX = 'https://flixcloud.cc';
+// Our own Cloudflare Worker HLS proxy (free tier). Video CDNs see Cloudflare's
+// IP instead of the backend's — used for English streams so Render's datacenter
+// IP being blocked doesn't break playback.
+const WORKER_BASE = 'https://mpv2-hls-proxy.gmpdi020.workers.dev';
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 const H = { 'User-Agent': UA, Accept: 'application/json, */*' };
@@ -137,6 +141,55 @@ export function proxyStreamUrl(upstreamUrl, animeId, ep) {
   return `/api/stream/r?${p.toString()}`;
 }
 
+/** Route any upstream URL through our Cloudflare Worker HLS proxy. */
+export function workerProxyUrl(upstreamUrl, referer) {
+  let w = `${WORKER_BASE}/hls?d=${b64url(upstreamUrl)}`;
+  if (referer) w += `&ref=${b64url(referer)}`;
+  return w;
+}
+
+/** Fetch an upstream URL through the worker (Cloudflare egress IP). */
+async function fetchViaWorker(url, referer) {
+  const res = await fetch(workerProxyUrl(url, referer), {
+    headers: { 'User-Agent': UA },
+  });
+  if (!res.ok) throw new Error(`Worker proxy ${res.status} for ${url}`);
+  return res;
+}
+
+/**
+ * Rewrite every URI in an HLS playlist to go through our worker proxy.
+ * Idempotent: URLs the worker already rewrote are normalized (not double-wrapped).
+ */
+export function rewritePlaylistViaWorker(text, playlistUrl, referer) {
+  const proxied = (raw) => {
+    try {
+      const abs = new URL(raw, playlistUrl).toString();
+      let target = abs;
+      if (abs.startsWith(`${WORKER_BASE}/hls`)) {
+        try {
+          const d = new URL(abs).searchParams.get('d');
+          if (d) target = unb64url(d) || abs;
+        } catch { /* keep abs */ }
+      }
+      return workerProxyUrl(target, referer);
+    } catch {
+      return raw;
+    }
+  };
+  return text
+    .split('\n')
+    .map((line) => {
+      const t = line.trim();
+      if (!t) return line;
+      if (t.startsWith('#')) {
+        return line.replace(/URI="([^"]+)"/g, (_m, uri) => `URI="${proxied(uri)}"`);
+      }
+      return proxied(t);
+    })
+    .join('\n');
+}
+
 /** Rewrite every URI in an HLS playlist to go through our /api/stream/r proxy. */
 export function rewritePlaylist(text, playlistUrl, animeId, ep) {
   const proxied = (raw) => {
@@ -202,7 +255,14 @@ export async function resolveWatch(animeId, anilistId, ep, type) {
       if (!stream.url) throw new Error('No stream URL extracted');
 
       // Validate + learn the audio tracks from the (possibly encrypted) master.
-      const plRes = await fetchUpstream(stream.url, `${FLIX}/`);
+      // Playlist bytes come through our worker (Cloudflare IP) so a blocked
+      // datacenter egress doesn't kill resolution; falls back to direct fetch.
+      let plRes = null;
+      try {
+        plRes = await fetchViaWorker(stream.url, `${FLIX}/`);
+      } catch {
+        plRes = await fetchUpstream(stream.url, `${FLIX}/`);
+      }
       if (!plRes.ok) throw new Error(`Playlist fetch ${plRes.status}`);
       let master = await plRes.text();
       const playlistKey = stream.playlist_key || stream.key || null;
@@ -212,18 +272,22 @@ export async function resolveWatch(animeId, anilistId, ep, type) {
       }
       const audioTracks = parseAudioTracks(master);
       keyByStream.set(key, playlistKey || '');
+      // Served to the player via /en/pl: decrypted, with every URI rewritten
+      // to the worker proxy so playback never touches the blocked egress IP.
+      const masterForServe = rewritePlaylistViaWorker(master, stream.url, `${FLIX}/`);
 
       const subtitles = (stream.subtitles || [])
         .filter((s) => s.url)
         .map((s, i) => ({
           label: s.language || `Subtitle ${i + 1}`,
           lang: (s.language || '').toLowerCase().includes('eng') ? 'en' : '',
-          url: `/api/stream/r?u=${b64url(s.url)}`,
+          url: workerProxyUrl(s.url),
         }));
 
       const entry = {
         hlsUrl: stream.url,
         playlistKey,
+        master: masterForServe,
         audioTracks,
         subtitles,
         resolvedAt: Date.now(),
@@ -243,6 +307,15 @@ export async function resolveWatch(animeId, anilistId, ep, type) {
 /** Look up a cached playlist key for proxy decryption. */
 export function playlistKeyForStream(animeId, ep) {
   return keyByStream.get(cacheKey(animeId, ep)) || undefined;
+}
+
+/** Look up the cached, worker-rewritten master playlist for /en/pl. */
+export function getCachedMaster(animeId, ep) {
+  const cached = streamCache.get(cacheKey(animeId, ep));
+  if (cached && Date.now() - cached.resolvedAt < STREAM_TTL_MS && cached.master) {
+    return cached.master;
+  }
+  return null;
 }
 
 /** Drop a cached stream so the next request re-resolves (token refresh). */

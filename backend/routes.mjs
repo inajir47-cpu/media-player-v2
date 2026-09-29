@@ -10,6 +10,7 @@ import {
   rewritePlaylist,
   proxyStreamUrl,
   playlistKeyForStream,
+  getCachedMaster,
   invalidateStream,
   unb64url,
   b64url,
@@ -83,7 +84,9 @@ router.get('/en/watch', async (req, res) => {
       ep,
       serverName: stream.serverName,
       dataType: stream.dataType,
-      stream: proxyStreamUrl(stream.hlsUrl, animeId, ep),
+      // Served by /en/pl below: decrypted master with every URI rewritten to
+      // our Cloudflare Worker proxy (never touches the blocked egress IP).
+      stream: `/api/stream/en/pl?animeId=${encodeURIComponent(animeId)}&ep=${ep}`,
       audioTracks: stream.audioTracks,
       subtitles: stream.subtitles,
     });
@@ -91,6 +94,25 @@ router.get('/en/watch', async (req, res) => {
     const status = e?.status === 404 ? 404 : 502;
     res.status(status).json({ error: e?.message || 'Stream resolution failed' });
   }
+});
+
+// GET /api/stream/en/pl?animeId=&ep=
+// Serves the cached master playlist (decrypted, worker-rewritten) for the player.
+// No upstream fetch happens here — everything already resolved by /en/watch.
+router.get('/en/pl', (req, res) => {
+  const animeId = String(req.query.animeId || '').trim();
+  const ep = parseInt(String(req.query.ep || ''), 10);
+  if (!animeId || !Number.isFinite(ep)) {
+    return res.status(400).json({ error: 'animeId and ep are required' });
+  }
+  const master = getCachedMaster(animeId, ep);
+  if (!master) {
+    return res.status(404).json({ error: 'Stream expired — please retry' });
+  }
+  res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  return res.send(master);
 });
 
 /**
