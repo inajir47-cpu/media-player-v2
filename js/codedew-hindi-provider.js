@@ -260,12 +260,13 @@ function cdHlsConfig(referer) {
 
 /* ---------- high-level: match title -> find series -> episode -> stream ---------- */
 var cdMatchCache = {};
-function cdMatch(title) {
+// Returns ALL good matches sorted by score (best first), so callers can
+// try each candidate (e.g. Season 1 vs Season 2 pages) until one works.
+function cdMatches(title) {
   var k = normTitle(title);
   if (!cdMatchCache[k]) {
     cdMatchCache[k] = cdSearch(title).then(function (rs) {
-      // Pick the best title match
-      var nq = normTitle(title), best = null, bestScore = 0;
+      var nq = normTitle(title), scored = [];
       (rs || []).forEach(function (r) {
         var nt = normTitle(r.title), s = 0;
         if (nt === nq) s = 100;
@@ -278,34 +279,59 @@ function cdMatch(title) {
           qw.forEach(function (w) { if (w.length > 2 && tw[w]) hit++; });
           if (hit >= 2 && hit >= qw.length - 1) s = 50;
         }
-        if (s > bestScore) { bestScore = s; best = r; }
+        // Prefer lower season numbers on ties (S1 before S2)
+        var season = 99;
+        var sm = nt.match(/season\s*(\d+)/);
+        if (sm) season = parseInt(sm[1], 10);
+        if (s >= 40) scored.push({ r: r, s: s, season: season });
       });
-      return bestScore >= 40 ? best : null;
-    }, function () { return null; });
+      scored.sort(function (a, b) {
+        return (b.s - a.s) || (a.season - b.season);
+      });
+      return scored.map(function (x) { return x.r; });
+    }, function () { return []; });
   }
   return cdMatchCache[k];
 }
+function cdMatch(title) {
+  return cdMatches(title).then(function (ms) {
+    return ms.length ? ms[0] : null;
+  });
+}
 
 function cdHasEpisode(title, n) {
-  return cdMatch(title).then(function (m) {
-    if (!m) return false;
-    return cdEpisodes(m.href).then(function (eps) {
-      return eps.some(function (e) { return e.number === n; });
-    }, function () { return false; });
+  return cdMatches(title).then(function (ms) {
+    if (!ms.length) return false;
+    // Try each candidate page in order until one has the episode.
+    var i = 0;
+    function next() {
+      if (i >= ms.length) return false;
+      var m = ms[i++];
+      return cdEpisodes(m.href).then(function (eps) {
+        return eps.some(function (e) { return e.number === n; }) ? true : next();
+      }, function () { return next(); });
+    }
+    return next();
   });
 }
 
 function cdWatchEp(title, n) {
-  return cdMatch(title).then(function (m) {
-    if (!m) throw new Error('Hindi-2 source not found for this title');
-    return cdEpisodes(m.href).then(function (eps) {
-      var e = null;
-      for (var i = 0; i < eps.length; i++) {
-        if (eps[i].number === n) { e = eps[i]; break; }
-      }
-      if (!e) throw new Error('This episode has no Hindi-2 stream');
-      return cdWatch(e.url);
-    });
+  return cdMatches(title).then(function (ms) {
+    if (!ms.length) throw new Error('Hindi-2 source not found for this title');
+    var i = 0;
+    function next() {
+      if (i >= ms.length) throw new Error('This episode has no Hindi-2 stream');
+      var m = ms[i++];
+      return cdEpisodes(m.href).then(function (eps) {
+        var e = null;
+        for (var j = 0; j < eps.length; j++) {
+          if (eps[j].number === n) { e = eps[j]; break; }
+        }
+        if (!e) return next();
+        return cdWatch(e.url);
+      }, function () { return next(); });
+    }
+    return next();
   }).then(function (src) {
     return { stream: src.url, subtitles: [], audioTracks: [],
       animeId: 'hindi2:' + title, ep: n, _direct: true, _referer: src.referer };
