@@ -22,6 +22,134 @@
 
   var SEC_ID = 'animation';
   var state = null; // per-render Discover state
+  // Last rendered title detail + its provider, for the rating/reviews popup
+  // and character popups (all prefetched when the detail page loads).
+  var lastDetail = null, lastDetailProvider = null;
+
+  // Generic bottom-sheet modal. Reuses the .st-scrim/.st-dialog dialog chrome
+  // from the provider chooser so popups look consistent.
+  function openPopup(title, sub, bodyHtml) {
+    closePopup();
+    var scrim = document.createElement('div');
+    scrim.className = 'st-scrim';
+    scrim.innerHTML =
+      '<div class="st-dialog rv-dialog" role="dialog" aria-modal="true" aria-label="' + esc(title) + '">' +
+        '<button class="st-x" type="button" aria-label="Close">' + icon('x') + '</button>' +
+        '<h3>' + esc(title) + '</h3>' +
+        (sub ? '<p class="st-sub">' + esc(sub) + '</p>' : '') +
+        '<div class="rv-body">' + bodyHtml + '</div>' +
+      '</div>';
+    document.body.appendChild(scrim);
+    function onKey(e) { if (e.key === 'Escape') closePopup(); }
+    scrim.addEventListener('click', function (e) { if (e.target === scrim) closePopup(); });
+    scrim.querySelector('.st-x').addEventListener('click', closePopup);
+    document.addEventListener('keydown', onKey);
+    scrim._onKey = onKey;
+    return scrim;
+  }
+  function closePopup() {
+    var s = document.querySelector('.st-scrim .rv-dialog');
+    if (s) {
+      var scrim = s.parentElement;
+      if (scrim && scrim._onKey) document.removeEventListener('keydown', scrim._onKey);
+      if (scrim) scrim.remove();
+    }
+  }
+
+  /* -------------------- rating details + reviews popup -------------------- */
+
+  // Simple AniList-flavoured markdown for review bodies.
+  function rvMd(s) {
+    var t = esc(s || '').trim();
+    if (!t) return '';
+    return t
+      .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+      .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+      .replace(/__([^_]+)__/g, '<b>$1</b>')
+      .replace(/~~([^~]+)~~/g, '<s>$1</s>')
+      .replace(/~!([\s\S]+?)!~/g, '<span class="spoiler">$1</span>')
+      .replace(/\n{2,}/g, '</p><p class="rv-p">').replace(/\n/g, '<br>');
+  }
+
+  function openReviewsPopup(d) {
+    var dist = (d.scoreDist || []).slice().sort(function (a, b) { return b.score - a.score; });
+    var revs = d.reviews || [];
+    var total = dist.reduce(function (a, s) { return a + (s.amount || 0); }, 0);
+    var max = dist.reduce(function (m, s) { return Math.max(m, s.amount || 0); }, 0);
+    var head =
+      '<div class="rv-score-head"><div class="rv-score-big">★ ' + esc((d.score / 10).toFixed(1)) + '</div>' +
+      '<div class="rv-score-sub">' + Number(total).toLocaleString('en-US') + ' ratings</div></div>' +
+      (dist.length ? '<div class="rv-bars">' + dist.map(function (s) {
+        var pct = max ? Math.round((s.amount / max) * 100) : 0;
+        return '<div class="rv-bar-row"><span class="rv-bar-score">' + esc(String(s.score)) + '</span>' +
+          '<span class="rv-bar-track"><span class="rv-bar-fill" style="width:' + pct + '%"></span></span>' +
+          '<span class="rv-bar-n">' + Number(s.amount || 0).toLocaleString('en-US') + '</span></div>';
+      }).join('') + '</div>' : '');
+    var list = revs.length ? '<h4 class="rv-sec">Reviews</h4>' + revs.map(function (rv, i) {
+      var body = rvMd(rv.body);
+      var long = (rv.body || '').length > 420;
+      var shown = long ? rvMd(rv.body.slice(0, 420)) + '…' : body;
+      var date = rv.createdAt
+        ? new Date(rv.createdAt * 1000).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '';
+      return '<article class="rv-card">' +
+        '<div class="rv-head">' +
+          (rv.avatar ? '<img class="rv-avatar" src="' + esc(rv.avatar) + '" alt="" loading="lazy">' :
+                       '<span class="rv-avatar rv-avatar-fb">' + esc((rv.user || '?').charAt(0).toUpperCase()) + '</span>') +
+          '<div class="rv-who"><b>' + esc(rv.user) + '</b>' +
+            '<span>' + (rv.score != null ? '★ ' + esc(String(rv.score)) + ' · ' : '') + esc(date) + '</span></div>' +
+        '</div>' +
+        (rv.summary ? '<div class="rv-summary">' + esc(rv.summary) + '</div>' : '') +
+        '<div class="rv-text"><p class="rv-p">' + shown + '</p>' +
+          (long ? '<div class="rv-full" hidden><p class="rv-p">' + body + '</p></div>' +
+                   '<button type="button" class="rv-more" data-rv-toggle>Show more</button>' : '') +
+        '</div></article>';
+    }).join('') : '<p class="rv-empty">No reviews yet.</p>';
+    var scrim = openPopup('Rating & Reviews', d.title, head + list);
+    scrim.addEventListener('click', function (e) {
+      var t = e.target.closest('[data-rv-toggle]');
+      if (!t) return;
+      var full = t.parentElement.querySelector('.rv-full');
+      var open = full.hidden;
+      full.hidden = !open;
+      t.textContent = open ? 'Show less' : 'Show more';
+    });
+  }
+
+  /* ------------------------- character popup ----------------------------- */
+
+  function characterPopupHtml(c) {
+    var anime = (c.anime || []).length
+      ? '<h4 class="rv-sec">Appears in</h4><div class="ch-pop-grid">' +
+        c.anime.map(function (a) {
+          return '<div class="ch-pop-item"><img src="' + esc(a.image) + '" alt="' + esc(a.title) +
+            '" loading="lazy"><span>' + esc(a.title) + '</span></div>';
+        }).join('') + '</div>' : '';
+    var vas = (c.vas || []).length
+      ? '<h4 class="rv-sec">Voice actors</h4><div class="cast-grid">' +
+        c.vas.map(function (v) {
+          return '<div class="cast-card"><img class="cast-card-photo" src="' + esc(v.image) +
+            '" alt="' + esc(v.name) + '" loading="lazy">' +
+            '<div class="cast-card-copy"><strong>' + esc(v.name) + '</strong>' +
+            '<span>Japanese</span></div></div>';
+        }).join('') + '</div>' : '';
+    return '<header class="ch-pop-hero"><span class="poster-img big"><img src="' + esc(c.image) +
+      '" alt="' + esc(c.name) + '"></span>' +
+      '<div class="detail-copy"><h1 class="ch-pop-name">' + esc(c.name) + '</h1>' +
+      (c.native ? '<p class="detail-meta dim">' + esc(c.native) + '</p>' : '') +
+      charFacts(c) + '</div></header>' +
+      '<h4 class="rv-sec">About</h4>' + charDescription(c) + anime + vas;
+  }
+
+  function openCharacterPopup(provider, id, name) {
+    var scrim = openPopup(name || 'Character', providerName(),
+      '<div class="rv-loading"><span class="spin"></span>Loading…</div>');
+    var body = scrim.querySelector('.rv-body');
+    API().characterDetail(provider, id, name).then(function (c) {
+      if (body && body.isConnected) body.innerHTML = characterPopupHtml(c);
+    }).catch(function () {
+      if (body && body.isConnected) body.innerHTML = '<p class="rv-empty">Could not load character info.</p>';
+    });
+  }
 
   function providerName() { return API().PROVIDERS[API().getProvider()].name; }
 
@@ -882,6 +1010,12 @@
     API().detail(provider, id, mediaType).then(function (d) {
       document.title = d.title + ' · ' + sec.name + ' · Media Player V2';
       mount.innerHTML = detailHtml(sec, d, mediaType);
+      lastDetail = d; lastDetailProvider = provider;
+      // Prefetch character details for every displayed cast card now, so the
+      // character popup opens instantly (results are cached 7 days).
+      (d.characters || []).forEach(function (c) {
+        if (c && c.id) API().characterDetail(provider, c.id, c.name).catch(function () {});
+      });
       tintFromPoster(mount, d.image);
       mountDetailVideo(mount, d, mediaType);
       mountEpList(mount, provider, id, d, (d.mediaType || mediaType) === 'MANGA');
@@ -907,8 +1041,17 @@
       : [(d.episodes && !isMovie) ? d.episodes + ' episodes' : ''];
     var meta = [prettyStatus(d.status, isManga), d.year || '', formatLabel(d)]
       .concat(counts)
-      .concat([d.score != null ? '★ ' + (d.score / 10).toFixed(1) : ''])
       .filter(Boolean).join(' · ');
+    // Tappable rating: opens the rating-details + reviews popup. The review
+    // data rides along with the detail query, so the popup opens instantly.
+    var hasRatingData = d.score != null &&
+      (((d.reviews || []).length) || ((d.scoreDist || []).length));
+    var ratingBtn = d.score != null
+      ? (hasRatingData
+        ? '<button type="button" class="rating-btn" data-open-reviews aria-label="Rating details and reviews">★ ' +
+          esc((d.score / 10).toFixed(1)) + '</button>'
+        : '<span class="rating-static">★ ' + esc((d.score / 10).toFixed(1)) + '</span>')
+      : '';
     var air = '';
     if (!isManga && d.nextAiring && d.nextAiring.airingAt) {
       var at = new Date(d.nextAiring.airingAt);
@@ -969,6 +1112,7 @@
           '" alt="' + esc(d.title) + ' poster"></span>' +
         '<div class="detail-copy"><p class="detail-kicker">' + esc(providerName()) + '</p>' +
           '<h1>' + esc(d.title) + '</h1><p class="detail-meta">' + esc(meta) + '</p>' +
+          (ratingBtn ? '<p class="detail-meta">' + ratingBtn + '</p>' : '') +
           (d.startText ? '<p class="detail-meta dim">' + esc(d.startText) + '</p>' : '') +
           studios +
           '<div class="genre-tags">' + (d.genres || []).map(function (g) {
@@ -1322,6 +1466,8 @@
     if (!t) return '<p class="synopsis dim">No description available.</p>';
     var html = esc(t)
       .replace(/___/g, '__') // collapse stray triple underscores
+      // [text](url) markdown links -> real anchors (before bold, urls have no markup)
+      .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
       .replace(/__([^_\n]+)__/g, '<b>$1</b>') // AniList markdown bold
       .replace(/~!([\s\S]+?)!~/g, '<span class="spoiler">$1</span>') // AniList spoiler
       .replace(/~([^~\n]*)~/g, '$1') // AniList strikethrough -> plain text
@@ -1398,15 +1544,19 @@
   // parseHash (it is no longer a registered tab), so no redirect is needed —
   // they land on the home page with the Discover block.
 
-  // One-time delegation: tappable cast cards + character-page back button.
+  // One-time delegation: rating popup, character popups, character-page back.
   // (Attached to document so it survives innerHTML re-renders of #view.)
   document.addEventListener('click', function (e) {
+    if (e.target.closest('[data-open-reviews]')) {
+      if (lastDetail) openReviewsPopup(lastDetail);
+      return;
+    }
     var card = e.target.closest('.online-cast[data-char-id]');
     if (card) {
-      var cname = card.getAttribute('data-char-name') || '';
-      location.hash = '#/' + SEC_ID + '/online/' + card.getAttribute('data-char-provider') +
-        '/character/' + encodeURIComponent(card.getAttribute('data-char-id')) +
-        (cname ? '?n=' + encodeURIComponent(cname) : '');
+      // Character info opens in a popup, not a full page. Details are
+      // prefetched when the title page loads, so this opens instantly.
+      openCharacterPopup(card.getAttribute('data-char-provider') || lastDetailProvider,
+        card.getAttribute('data-char-id'), card.getAttribute('data-char-name') || '');
       return;
     }
     if (e.target.closest('[data-go-back]')) {

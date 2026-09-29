@@ -181,6 +181,9 @@
         ' idMal duration streamingEpisodes{title thumbnail url site}' +
         ' studios{nodes{name}} startDate{year month day}' +
         ' nextAiringEpisode{episode airingAt}' +
+        ' stats{scoreDistribution{score amount}}' +
+        ' reviews(perPage:8,sort:RATING_DESC){nodes{id summary body(asHtml:false)' +
+        ' score user{name avatar{large}} createdAt}}' +
         ' relations{edges{relationType node{id title{romaji english} coverImage{large} averageScore status' +
         ' startDate{year month day} episodes chapters format}}}' +
         ' characters(perPage:25){edges{role node{id name{full} image{large}}' +
@@ -194,6 +197,18 @@
         item.startText = [m.startDate.day, m.startDate.month, m.startDate.year].filter(Boolean).join('/');
         item.nextAiring = m.nextAiringEpisode
           ? { episode: m.nextAiringEpisode.episode, airingAt: m.nextAiringEpisode.airingAt * 1000 } : null;
+        // Reviews + score distribution ride along with the detail query so
+        // the rating popup opens instantly — no wait when tapped.
+        item.scoreDist = ((m.stats && m.stats.scoreDistribution) || []).map(function (s) {
+          return { score: s.score, amount: s.amount };
+        });
+        item.reviews = ((m.reviews && m.reviews.nodes) || []).map(function (rv) {
+          var u = rv.user || {};
+          return { id: rv.id, summary: rv.summary || '', body: rv.body || '',
+                   score: rv.score || null, user: u.name || '?',
+                   avatar: (u.avatar && u.avatar.large) || '',
+                   createdAt: rv.createdAt || null };
+        });
         var rels = (m.relations && m.relations.edges) || [];
         // Seasons: walk the prequel/sequel chain around this title.
         var seasons = rels
@@ -784,6 +799,30 @@
     return Promise.resolve(streamEpsFallback(detail));
   }
 
+  // AniList per-episode air dates, keyless. Pages through the whole
+  // airingSchedule and maps episode number -> airing timestamp (ms).
+  // Cached 48h like the other API responses.
+  function anilistAirDates(mediaId) {
+    return cached('airdates:' + mediaId, function () {
+      var map = {};
+      function fetchPage(p) {
+        return alQuery(
+          'query($id:Int,$p:Int){Media(id:$id,type:ANIME){' +
+          'airingSchedule(page:$p,perPage:50){pageInfo{hasNextPage} nodes{episode airingAt}}}}',
+          { id: mediaId, p: p }
+        ).then(function (d) {
+          var s = d.Media && d.Media.airingSchedule;
+          ((s && s.nodes) || []).forEach(function (n) {
+            if (n.episode && n.airingAt && !map[n.episode]) map[n.episode] = n.airingAt * 1000;
+          });
+          if (s && s.pageInfo && s.pageInfo.hasNextPage && p < 20) return fetchPage(p + 1);
+          return map;
+        });
+      }
+      return fetchPage(1);
+    });
+  }
+
   // Normalized chapter: { n, title, date, pages, thumb }.
   function kitsuChapters(ksId, page) {
     var limit = 20, off = (page - 1) * limit;
@@ -1040,6 +1079,26 @@
         if (p === 'jikan') return jikanEpisodes(id, page, detail && detail.durationMin);
         return anilistEpisodes(detail || {}, page);
       }
+      // Air dates: Jikan is often rate-limited/empty, so AniList's own
+      // airingSchedule (keyless, cached) fills any missing per-episode dates.
+      // Started in parallel; applied AFTER the synth fallback so every path
+      // (Jikan, streaming fallback, synthesized cards) gets dates.
+      var airP = (p === 'anilist' && detail && detail.id)
+        ? anilistAirDates(detail.id).catch(function () { return {}; })
+        : null;
+      function withAirDates(r) {
+        if (!airP) return Promise.resolve(r);
+        return airP.then(function (map) {
+          (r.items || []).forEach(function (it) {
+            var ts = map[it.n];
+            if (ts && !it.ts) {
+              it.ts = ts;
+              it.date = fmtDay(new Date(ts).toISOString());
+            }
+          });
+          return r;
+        });
+      }
       function fill(r) {
         // TMDB stills fill episodes that have no own still yet.
         if (detail && detail.title)
@@ -1050,6 +1109,8 @@
         // Never show a bare/empty section: fall back to synthesized cards
         // from the known total when the APIs come back empty.
         if (!r.items.length && detail && detail.episodes) r = synthEpisodes(detail, page);
+        return withAirDates(r);
+      }).then(function (r) {
         return fill(r);
       }).then(function (r) {
         api48Set(key, r); return r;

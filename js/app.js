@@ -2129,6 +2129,16 @@
     }, { passive: true });
     view.addEventListener('touchend', function (e) {
       if (!startTarget || startTarget.closest('[data-poster-rail],input,textarea,video,[role="dialog"]')) return;
+      // Never hijack a swipe that begins inside a horizontally scrollable
+      // strip (Top 10 carousel, episode strips, poster rails, chip rows):
+      // that gesture belongs to the strip, not to tab navigation.
+      for (var el = startTarget; el && el !== view; el = el.parentElement) {
+        if (el.scrollWidth > el.clientWidth + 8) {
+          var ox = '';
+          try { ox = getComputedStyle(el).overflowX; } catch (err) {}
+          if (ox === 'auto' || ox === 'scroll') return;
+        }
+      }
       var touch = e.changedTouches[0];
       var dx = touch.clientX - startX, dy = touch.clientY - startY;
       if (Math.abs(dx) < 72 || Math.abs(dx) < Math.abs(dy) * 1.3) return;
