@@ -9,7 +9,7 @@ const FLIX = 'https://flixcloud.cc';
 // Our own Cloudflare Worker HLS proxy (free tier). Video CDNs see Cloudflare's
 // IP instead of the backend's — used for English streams so Render's datacenter
 // IP being blocked doesn't break playback.
-const WORKER_BASE = 'https://mpv2-hls-proxy.gmpdi020.workers.dev';
+export const WORKER_BASE = 'https://mpv2-hls-proxy.gmpdi020.workers.dev';
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 const H = { 'User-Agent': UA, Accept: 'application/json, */*' };
