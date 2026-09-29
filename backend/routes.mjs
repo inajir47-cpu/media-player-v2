@@ -26,7 +26,8 @@ const UPSTREAM_UA =
 router.get('/health', (_req, res) => res.json({ ok: true, service: 'stream' }));
 
 // GET /api/stream/en/diag — temporary connectivity diagnostics (Render -> worker -> upstream).
-router.get('/en/diag', async (_req, res) => {
+// Optional ?url=<plain https url> probes that URL through the worker too.
+router.get('/en/diag', async (req, res) => {
   const out = { node: process.version };
   const timed = async (label, fn) => {
     const t0 = Date.now();
@@ -49,6 +50,13 @@ router.get('/en/diag', async (_req, res) => {
     const r = await fetch(apiUrl, { headers: { 'User-Agent': UPSTREAM_UA, Accept: 'application/json, */*' } });
     return { status: r.status, body: (await r.text()).slice(0, 120) };
   });
+  const probe = String(req.query.url || '');
+  if (/^https:\/\//.test(probe)) {
+    await timed('probeViaWorker', async () => {
+      const r = await fetch(workerProxyUrl(probe), { headers: { 'User-Agent': UPSTREAM_UA } });
+      return { status: r.status, body: (await r.text()).slice(0, 160) };
+    });
+  }
   res.json(out);
 });
 
