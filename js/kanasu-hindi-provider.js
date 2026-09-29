@@ -336,6 +336,14 @@
                 if (!frames.length) throw new Error('No video servers found for this Hindi episode');
                 return frames;
               }).then(function (frames) {
+                // Try the most reliable servers first, regardless of page order.
+                function hostRank(u) {
+                  if (u.indexOf('https://turbonewvid.com/') === 0) return 0;
+                  if (u.indexOf('https://rubystm.com') === 0) return 1;
+                  if (u.indexOf('https://vidmoly.net/') === 0) return 2;
+                  return 3;
+                }
+                frames.sort(function (a, b) { return hostRank(a) - hostRank(b); });
                 function attempt(i) {
                   if (i >= frames.length) return Promise.reject(new Error('All Hindi servers failed for this episode'));
                   var u = frames[i], job;

@@ -30,8 +30,10 @@
   };
   // Route every provider URL through our backend proxy (overrides the
   // provider's own hiProxyX, which only proxies inside the APK).
+  // NOTE: must be ABSOLUTE — rewritten HLS playlists become blob: URLs, and
+  // relative segment URLs would resolve to unloadable blob:http://... URLs.
   window.hiProxyX = function (u, referer, origin) {
-    var p = '/api/stream/r?u=' + stB64url(u);
+    var p = location.origin + '/api/stream/r?u=' + stB64url(u);
     if (referer) p += '&xreferer=' + encodeURIComponent(referer);
     if (origin) p += '&xorigin=' + encodeURIComponent(origin);
     return p;
