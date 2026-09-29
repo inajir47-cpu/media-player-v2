@@ -980,17 +980,43 @@
   }
 
   // Placeholder for the episode (anime) / chapter (manga) list; filled in
-  // lazily after the detail renders. Movies (1 episode) get no episode list.
+  // lazily after the detail renders. Movies (1 episode) get a single
+  // episode-style row labelled "Movie" with the runtime, wired to the same
+  // provider dialog as episode cards (stream.js queueCard picks up
+  // .episode-card[data-ep-n] inside [data-ep-grid] automatically).
   // Long lists (e.g. 1100+ episodes) are a horizontal slide strip: swipe
   // sideways, more pages load as you near the right end.
   function epListPlaceholder(d, isManga) {
-    if (!isManga && d.episodes === 1) return '';
+    if (!isManga && d.episodes === 1) return movieRowHtml(d);
     var kind = isManga ? 'ch' : 'ep';
     return '<section class="online-block" data-' + kind + '-block hidden>' +
       '<div class="ep-head-row"><h2 data-' + kind + '-head></h2>' +
       '<label class="ep-jump"><span>' + (isManga ? 'Ch' : 'Ep') + ' #</span>' +
       '<input type="number" min="1" inputmode="numeric" data-' + kind + '-jump placeholder="123"></label></div>' +
       '<div class="ep-strip" data-' + kind + '-grid></div></section>';
+  }
+
+  // Single static "episode" row for movies: poster thumb, "Movie" number
+  // badge, title, and runtime — same card styling as episodes so the
+  // stream wiring (badges + globe button) attaches unchanged.
+  function movieRowHtml(d) {
+    var mins = d.durationMin ? d.durationMin + ' min' : '';
+    var label = String(d.format || '').toUpperCase() === 'MOVIE' ? 'Movie' : 'Episode';
+    var key = (d.provider || 'anilist') + ':' + d.id + ':ep:1';
+    return '<section class="online-block" data-ep-block data-ep-movie>' +
+      '<div class="ep-head-row"><h2>' + label + '</h2></div>' +
+      '<div class="ep-strip" data-ep-grid>' +
+      '<article class="episode-card" data-ep-n="1">' +
+      (d.image ? '<img src="' + esc(d.image) + '" alt="" loading="lazy">' :
+        '<span class="episode-card-num">1</span>') +
+      '<span class="episode-number">' + label + '</span>' +
+      '<span class="episode-actions">' +
+      '<button class="episode-action" data-ep-watched="' + esc(key) +
+      '" aria-label="Mark ' + label.toLowerCase() + ' watched">' + icon('edit') + '</button>' +
+      '</span>' +
+      '<div class="episode-open"><h4>' + esc(d.title || label) + '</h4>' +
+      (mins ? '<p>' + esc(mins) + '</p>' : '') + '</div>' +
+      '</article></div></section>';
   }
 
   // ---- live countdowns: boxed DAYS / HRS / MIN / SEC ----
@@ -1079,6 +1105,16 @@
     var kind = isCh ? 'ch' : 'ep';
     var block = mount.querySelector('[data-' + kind + '-block]');
     if (!block) return;
+    block.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-ep-watched]');
+      if (!b) return;
+      var card = b.closest('.episode-card');
+      var on = !card.classList.contains('watched');
+      card.classList.toggle('watched', on);
+      setEpWatched(b.getAttribute('data-ep-watched'), on);
+    });
+    // Movie block: single static row, already in the HTML — no pagination.
+    if (block.hasAttribute('data-ep-movie')) { block.hidden = false; return; }
     var strip = block.querySelector('[data-' + kind + '-grid]');
     var head = block.querySelector('[data-' + kind + '-head]');
     var jumpInput = block.querySelector('[data-' + kind + '-jump]');
@@ -1152,14 +1188,6 @@
       if (strip.scrollLeft + strip.clientWidth > strip.scrollWidth - 600) {
         page++; load();
       }
-    });
-    block.addEventListener('click', function (e) {
-      var b = e.target.closest('[data-ep-watched]');
-      if (!b) return;
-      var card = b.closest('.episode-card');
-      var on = !card.classList.contains('watched');
-      card.classList.toggle('watched', on);
-      setEpWatched(b.getAttribute('data-ep-watched'), on);
     });
     load();
   }

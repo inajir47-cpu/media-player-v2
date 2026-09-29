@@ -471,10 +471,23 @@
   }
 
   var openDlg = null; // { n, avail, refresh } — refreshed when staged availability resolves
+  var lastEmptyToast = 0; // throttle for the no-providers toast in openProviderDialog
   function openProviderDialog(ctx, n, avail) {
     closeDialog();
     var provs = providersFor(avail);
-    if (!provs.length) return;
+    // No servers staged: say so instead of silently doing nothing (this is
+    // the movie Play path — checkEpisodeStaged calls back once per check,
+    // so throttle the toast to avoid doubles).
+    if (!provs.length) {
+      var now = Date.now();
+      if (now - lastEmptyToast > 2500) {
+        lastEmptyToast = now;
+        if (window.MPV2 && typeof window.MPV2.toast === 'function') {
+          window.MPV2.toast('No streams found for this title yet');
+        }
+      }
+      return;
+    }
     var scrim = document.createElement('div');
     scrim.className = 'st-scrim';
     scrim.innerHTML =
