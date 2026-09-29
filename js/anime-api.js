@@ -252,7 +252,7 @@
         ' dateOfBirth{year month day} age gender bloodType favourites' +
         ' media(perPage:12 sort:POPULARITY_DESC){edges{characterRole' +
         '  voiceActors(language:JAPANESE){id name{full} image{large}}' +
-        '  node{type id title{romaji english} coverImage{large} averageScore}}}}}}',
+        '  node{type id title{romaji english} coverImage{large} averageScore}}}}}',
         { id: parseInt(id, 10) }
       ).then(function (d) {
         var c = d.Character || {};
