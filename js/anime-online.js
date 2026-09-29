@@ -1217,9 +1217,24 @@
     try { localStorage.setItem(EP_WATCHED_KEY, JSON.stringify(w)); } catch (e) {}
   }
 
-  function epCardHtml(provider, id, it, isCh, cover) {
+  function epCardHtml(provider, id, it, isCh, cover, hkey) {
     var key = provider + ':' + id + ':' + (isCh ? 'ch' : 'ep') + ':' + it.n;
-    var watched = !!epWatched()[key];
+    var manualWatched = !!epWatched()[key];
+    // Per-episode watch progress: auto-complete when watched to the end,
+    // progress bar when partially watched.
+    var prog = null;
+    if (!isCh && hkey) {
+      try {
+        var W = window.MPV2 && window.MPV2.Watch;
+        var pm = W ? W.getEpProgress(hkey) : null;
+        if (pm) prog = pm[it.n] || null;
+      } catch (e) { prog = null; }
+    }
+    var done = manualWatched || !!(prog && prog.done);
+    var pct = 0;
+    if (!done && prog && prog.d > 0 && prog.p > 5) {
+      pct = Math.max(2, Math.min(100, Math.round((prog.p / prog.d) * 100)));
+    }
     var num = isCh ? 'Ch ' + it.n : String(it.n).padStart(2, '0');
     var soon = it.ts && it.ts > Date.now();
     var thumb = it.thumb || cover || '';
@@ -1228,11 +1243,12 @@
     var foot = soon
       ? cdBoxesHtml(it.ts, true)
       : (sub ? '<p>' + esc(sub) + '</p>' : '');
-    return '<article class="episode-card' + (watched ? ' watched' : '') + '" data-' + (isCh ? 'ch' : 'ep') + '-n="' + it.n + '">' +
+    return '<article class="episode-card' + (done ? ' watched' : '') + '" data-' + (isCh ? 'ch' : 'ep') + '-n="' + it.n + '">' +
       (thumb ? '<img src="' + esc(thumb) + '" alt="" loading="lazy">' :
         '<span class="episode-card-num">' + esc(String(it.n)) + '</span>') +
       '<span class="episode-number">' + esc(num) + '</span>' +
       (soon ? '<span class="ep-soon">SOON</span>' : '') +
+      (pct ? '<span class="ep-progress"><span style="width:' + pct + '%"></span></span>' : '') +
       '<span class="episode-actions">' +
         (it.url ? '<a class="episode-action online" href="' + esc(it.url) +
           '" target="_blank" rel="noopener" aria-label="Watch online">' + icon('globe') + '</a>' : '') +
@@ -1258,6 +1274,15 @@
     var kind = isCh ? 'ch' : 'ep';
     var block = mount.querySelector('[data-' + kind + '-block]');
     if (!block) return;
+    // History key for per-episode progress — same scheme as the player
+    // (stream.js): 'anilist:<id>' when known, else 't:<title>'.
+    var hkey = null;
+    if (!isCh && d) {
+      var hprov = d.provider || provider;
+      var haid = (hprov === 'anilist' && d.id) ? String(d.id) : null;
+      hkey = haid ? 'anilist:' + haid
+                  : 't:' + String(d.title || '').toLowerCase().trim();
+    }
     block.addEventListener('click', function (e) {
       var b = e.target.closest('[data-ep-watched]');
       if (!b) return;
@@ -1272,7 +1297,8 @@
     var head = block.querySelector('[data-' + kind + '-head]');
     var jumpInput = block.querySelector('[data-' + kind + '-jump]');
     var page = 1, total = isCh ? (d.chapters || null) : (d.episodes || null);
-    var hasMore = false, loading = false, jumping = null;
+    var hasMore = false, loading = false, jumping = null, jumpingSilent = false;
+    var didCenter = false;
     function setHead() {
       head.textContent = (isCh ? 'Chapters' : 'Episodes') +
         (total ? ' · ' + total + ' listed' : '');
@@ -1281,24 +1307,52 @@
     // Jump to episode/chapter number: auto-loads pages until the card
     // exists, then scrolls it into the center of the strip with a flash.
     function flash(card) {
-      card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      centerCard(card);
       card.classList.remove('ep-flash');
       void card.offsetWidth;
       card.classList.add('ep-flash');
     }
-    function jumpTo(n) {
+    function centerCard(card) {
+      try { card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }); }
+      catch (e) {}
+    }
+    function jumpTo(n, silent) {
       var card = strip.querySelector('[data-' + kind + '-n="' + n + '"]');
-      if (card) { jumping = null; flash(card); return; }
+      if (card) {
+        jumping = null; jumpingSilent = false;
+        if (silent) centerCard(card); else flash(card);
+        return;
+      }
       if (!hasMore) {
-        jumping = null;
-        if (jumpInput) {
+        jumping = null; jumpingSilent = false;
+        if (!silent && jumpInput) {
           jumpInput.classList.add('miss');
           setTimeout(function () { jumpInput.classList.remove('miss'); }, 900);
         }
         return;
       }
-      jumping = n;
+      jumping = n; jumpingSilent = !!silent;
       if (!loading) { page++; load(); }
+    }
+    // The episode to center when the list first opens: the partially-watched
+    // one (resume point), else the next episode after the last completed one.
+    function currentEp() {
+      if (isCh || !hkey) return null;
+      try {
+        var W = window.MPV2 && window.MPV2.Watch;
+        var pm = W ? W.getEpProgress(hkey) : null;
+        if (!pm) return null;
+        var resume = null, maxDone = 0;
+        Object.keys(pm).forEach(function (k) {
+          var n = parseInt(k, 10), r = pm[k];
+          if (!(n > 0) || !r) return;
+          if (r.done) { if (n > maxDone) maxDone = n; }
+          else if (r.p > 5 && (resume == null || n < resume)) resume = n;
+        });
+        if (resume != null) return resume;
+        if (maxDone > 0) return maxDone + 1;
+      } catch (e) {}
+      return null;
     }
     function maybeLoadMore() {
       // Strip shorter than the viewport: keep paging until it scrolls
@@ -1322,11 +1376,18 @@
         if (!total && r.total) total = r.total;
         setHead();
         strip.insertAdjacentHTML('beforeend', r.items.map(function (it) {
-          return epCardHtml(provider, id, it, isCh, d.image);
+          return epCardHtml(provider, id, it, isCh, d.image, hkey);
         }).join(''));
         hasMore = !!r.hasMore;
         maybeLoadMore();
-        if (jumping != null) jumpTo(jumping);
+        if (jumping != null) jumpTo(jumping, jumpingSilent);
+        // First paint: center the current episode (resume / next-up) so it's
+        // right under the thumb when the page is reopened.
+        if (!didCenter) {
+          didCenter = true;
+          var ce = currentEp();
+          if (ce && ce > 1 && (!total || ce <= total)) jumpTo(ce, true);
+        }
       }).catch(function () { loading = false; if (page === 1) block.remove(); });
     }
     if (jumpInput) {

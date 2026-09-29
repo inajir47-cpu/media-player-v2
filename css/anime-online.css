@@ -407,6 +407,17 @@ button.trailer-btn { border: 0; cursor: pointer; font-family: inherit; }
   0%, 60% { box-shadow: 0 0 0 2px var(--accent), 0 0 24px var(--accent); }
   100% { box-shadow: none; }
 }
+/* Per-episode watch progress: thin bar along the card's bottom edge.
+ * Completed episodes reuse the existing .watched border tint. */
+.ep-progress {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 5px; z-index: 5;
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 0 0 14px 14px; overflow: hidden;
+}
+.ep-progress > span {
+  display: block; height: 100%; width: 0;
+  background: var(--tone, #f97316);
+}
 
 /* ---------- Opening-theme video previews ---------- */
 .poster-img .op-preview {

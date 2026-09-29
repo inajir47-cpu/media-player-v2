@@ -8,7 +8,9 @@
 
   var LS_HISTORY = 'mpv2_watch_history_v1';
   var LS_WL = 'mpv2_online_watchlist_v1';
+  var LS_EPPROG = 'mpv2_ep_progress_v1';
   var MAX_HISTORY = 60;
+  var MAX_EPPROG = 400;
 
   function read(key, fb) {
     try {
@@ -43,7 +45,44 @@
     var h = getHistory().filter(function (e) { return e && e.key !== entry.key; });
     h.unshift(entry);
     write(LS_HISTORY, h.slice(0, MAX_HISTORY));
+    saveEpProgress(entry);
     notify();
+  }
+  /* Per-episode progress, so episode cards can show a progress bar /
+   * watched state even for episodes that aren't the most recent one.
+   * map: "<titleKey>:ep:<n>" -> { p: position, d: duration, done: 0|1, t }
+   */
+  function getEpProgressMap() {
+    var m = read(LS_EPPROG, {});
+    return (m && typeof m === 'object') ? m : {};
+  }
+  function saveEpProgress(entry) {
+    if (!entry || entry.kind === 'movie') return;
+    var n = parseInt(entry.episode, 10);
+    if (!(n > 0)) return;
+    var m = getEpProgressMap();
+    m[entry.key + ':ep:' + n] = {
+      p: Math.floor(entry.position || 0),
+      d: Math.floor(entry.duration || 0),
+      done: isDone(entry) ? 1 : 0,
+      t: Date.now()
+    };
+    var keys = Object.keys(m);
+    if (keys.length > MAX_EPPROG) {
+      keys.sort(function (a, b) { return (m[a].t || 0) - (m[b].t || 0); });
+      for (var i = 0; i < keys.length - MAX_EPPROG; i++) delete m[keys[i]];
+    }
+    write(LS_EPPROG, m);
+  }
+  // { epNumber: { p, d, done } } for one title key
+  function getEpProgress(key) {
+    var m = getEpProgressMap(), out = {}, prefix = key + ':ep:';
+    Object.keys(m).forEach(function (k) {
+      if (k.indexOf(prefix) !== 0) return;
+      var n = parseInt(k.slice(prefix.length), 10);
+      if (n > 0) out[n] = m[k];
+    });
+    return out;
   }
   function getEntry(key) {
     var h = getHistory();
@@ -119,6 +158,7 @@
     getEntry: getEntry,
     removeEntry: removeEntry,
     isDone: isDone,
+    getEpProgress: getEpProgress,
     recentForSection: recentForSection,
     getWatchlist: getWatchlist,
     isSaved: isSaved,
