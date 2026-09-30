@@ -1244,55 +1244,46 @@
     });
   }
 
-  // Manga resume button (chunk 3 refinement): a concise anime-style label —
-  // "Continue Ch N" for a partially-read chapter, "Read Ch N" for the next
-  // chapter after the last finished one — placed next to the Read globe.
-  // Painted once the MangaDex uuid resolves; the label refreshes live on
-  // mpv2:history, and the button hides when there is nothing to resume.
-  function mountResumeButton(mount, d) {
+  // Manga smart Read button: mutually exclusive with the resume state.
+  // No history -> "Read" (opens the source dialog). Has history ->
+  // "Continue Ch N" (opens the reader directly at that chapter).
+  // Book icon in both states; label repaints live on mpv2:history.
+  function mountSmartReadButton(mount, d) {
     if ((d.mediaType || '') !== 'MANGA') return;
-    var actions = mount.querySelector('.detail-actions');
+    var readBtn = mount.querySelector('[data-md-read]');
     var MS = window.MPV2 && window.MPV2.MangaSource;
     var MR = window.MPV2 && window.MPV2.MangaReader;
     var A = window.MPV2 && window.MPV2.AnimeAPI;
-    if (!actions || !MS || !MR || !A ||
+    if (!readBtn || !MS || !MR || !A ||
         typeof A.mdMangaUuid !== 'function' || typeof MR.resumeInfo !== 'function') return;
-    var uuid = null, btn = null;
+    var uuid = null;
+    function target() {
+      var info = null;
+      try { info = uuid ? MR.resumeInfo(uuid) : null; } catch (e) {}
+      if (info && info.ch && !(d.chapters && info.ch > d.chapters)) return info.ch;
+      return null;
+    }
     function paint() {
-      if (!actions.isConnected) {
+      if (!readBtn.isConnected) {
         document.removeEventListener('mpv2:history', onHist);
         return;
       }
-      var info = null;
-      try { info = uuid ? MR.resumeInfo(uuid) : null; } catch (e) {}
-      var show = info && info.ch && !(d.chapters && info.ch > d.chapters);
-      if (show) {
-        var label = (info.partial ? 'Continue Ch ' : 'Read Ch ') + info.ch;
-        if (!btn) {
-          btn = document.createElement('button');
-          btn.className = 'trailer-btn';
-          btn.type = 'button';
-          btn.setAttribute('data-md-resume', '');
-          var readBtn = actions.querySelector('[data-md-read]');
-          if (readBtn && readBtn.nextSibling) actions.insertBefore(btn, readBtn.nextSibling);
-          else actions.appendChild(btn);
-          btn.addEventListener('click', function () {
-            var cur = null;
-            try { cur = uuid ? MR.resumeInfo(uuid) : null; } catch (e) {}
-            if (cur && cur.ch) {
-              MS.openChapter({ title: d.title, malId: d.malId || null, image: d.image || '' },
-                             String(cur.ch));
-            }
-          });
-        }
-        btn.innerHTML = icon('play') + '<span>' + esc(label) + '</span>';
-        btn.setAttribute('aria-label', label + ' — ' + d.title);
-        btn.hidden = false;
-      } else if (btn) {
-        btn.hidden = true;
+      var ch = target();
+      if (ch) {
+        readBtn.innerHTML = icon('book') + '<span>' + esc('Continue Ch ' + ch) + '</span>';
+        readBtn.setAttribute('aria-label', 'Continue Ch ' + ch + ' — ' + d.title);
+      } else {
+        readBtn.innerHTML = icon('book') + '<span>Read</span>';
+        readBtn.setAttribute('aria-label', 'Read manga');
       }
     }
     function onHist() { paint(); }
+    readBtn.addEventListener('click', function () {
+      var ctx = { title: d.title, malId: d.malId || null, image: d.image || '' };
+      var ch = target();
+      if (ch) MS.openChapter(ctx, String(ch));
+      else MS.openSourceDialog(ctx);
+    });
     document.addEventListener('mpv2:history', onHist);
     A.mdMangaUuid(d.malId || null, d.title || '').then(function (u) {
       uuid = u || '';
@@ -1324,17 +1315,8 @@
       whenStreamReady(function (S) { S.wireDetail(mount, provider, id, d, mediaType); });
       var woBtn = mount.querySelector('[data-watch-order]');
       if (woBtn) woBtn.addEventListener('click', function () { openWatchOrder(provider, d); });
-      // Chunk 2 (manga): header globe opens the source/provider dialog.
-      var mdReadBtn = mount.querySelector('[data-md-read]');
-      if (mdReadBtn && window.MPV2 && window.MPV2.MangaSource) {
-        mdReadBtn.addEventListener('click', function () {
-          window.MPV2.MangaSource.openSourceDialog({
-            title: d.title, malId: d.malId || null, image: d.image || ''
-          });
-        });
-      }
-      // Manga resume button: concise "Continue Ch N" / "Read Ch N".
-      mountResumeButton(mount, d);
+      // Manga smart Read button: "Read" <-> "Continue Ch N", book icon.
+      mountSmartReadButton(mount, d);
       ensureCountdownTicker();
       window.scrollTo(0, 0);
     }).catch(function (err) {
@@ -1389,7 +1371,7 @@
     // Chunk 2 (manga): prominent globe in the header action row — opens the
     // manga source/provider dialog, mirroring the anime streaming flow.
     var readBtn = isManga
-      ? '<button class="trailer-btn" data-md-read aria-label="Read manga">' + icon('globe') +
+      ? '<button class="trailer-btn" data-md-read aria-label="Read manga">' + icon('book') +
         '<span>Read</span></button>' : '';
     var coming = d.startTs && d.startTs > Date.now()
       ? '<div class="detail-coming"><span class="coming-label">COMING SOON</span>' +
