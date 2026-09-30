@@ -670,7 +670,12 @@
     if (playerHls) { try { playerHls.destroy(); } catch (e) {} playerHls = null; }
     playerBlobUrls.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) {} });
     playerBlobUrls = [];
-    var p = document.querySelector('.st-player'); if (p) p.remove();
+    var p = document.querySelector('.st-player');
+    if (p) {
+      if (p._ytRevStop) { try { p._ytRevStop(); } catch (e) {} }
+      if (p._ytCdStop) { try { p._ytCdStop(); } catch (e) {} }
+      p.remove();
+    }
     document.removeEventListener('keydown', escClose);
   }
 
@@ -737,6 +742,7 @@
       if (ctx.episodes && nn > ctx.episodes) return;
       startWatch(ctx, nn, prov, lang);
     }
+    shell._ytGoEp = goEp;
     var prevBtn = shell.querySelector('.st-p-prev');
     var nextBtn = shell.querySelector('.st-p-next');
     if (prevBtn) {
@@ -852,29 +858,150 @@
   function openPlayerShell(ctx, n, provName, lang) {
     closePlayer();
     var el = document.createElement('div');
-    el.className = 'st-player';
+    el.className = 'st-player st-yt';
     el.innerHTML =
-      '<div class="st-p-top">' +
-        '<button class="st-p-btn st-p-back" type="button" aria-label="Back">' + icon('x') + '</button>' +
-        '<div class="st-p-title"><b>' + esc(ctx.title || 'Episode ' + n) + '</b>' +
-          '<i>EP ' + n + ' · ' + esc(provName) + ' · ' + esc(lang) + '</i></div>' +
-        (ctx.isMovie ? '' :
-          '<button class="st-p-btn st-p-prev" type="button" aria-label="Previous episode">' + icon('arrowLeft') + '</button>' +
-          '<button class="st-p-btn st-p-next" type="button" aria-label="Next episode">' + icon('arrowRight') + '</button>') +
-        '<button class="st-p-btn st-p-audio hidden" type="button" aria-label="Audio track">Native</button>' +
-        '<button class="st-p-btn st-p-subs hidden" type="button" aria-label="Subtitles">Subs</button>' +
+      '<div class="st-yt-main">' +
+        '<div class="st-yt-video-wrap">' +
+          '<video class="st-p-video" controls playsinline preload="auto"></video>' +
+          '<div class="st-gesture-ind" aria-hidden="true"></div>' +
+          '<div class="st-p-loading"><span class="st-p-spin"></span><i>Loading stream…</i></div>' +
+          '<div class="st-p-error hidden"><b>Stream failed</b><p></p>' +
+            '<button class="st-p-retry" type="button">Retry</button></div>' +
+        '</div>' +
+        '<div class="st-yt-info">' +
+          '<h2 class="st-yt-series">' + esc(ctx.title || 'Episode ' + n) + '</h2>' +
+          '<p class="st-yt-ep-title">' + (ctx.isMovie ? 'Movie' : 'Episode ' + n) +
+            ' · ' + esc(provName) + ' · ' + esc(lang) + '</p>' +
+          '<div class="st-yt-actions">' +
+            (ctx.isMovie ? '' :
+              '<button class="st-p-btn st-yt-btn st-p-prev" type="button" aria-label="Previous episode">' + icon('arrowLeft') + '</button>' +
+              '<button class="st-p-btn st-yt-btn st-p-next" type="button" aria-label="Next episode">' + icon('arrowRight') + '</button>') +
+            '<button class="st-p-btn st-yt-btn st-p-audio hidden" type="button" aria-label="Audio track">Audio</button>' +
+            '<button class="st-p-btn st-yt-btn st-p-subs hidden" type="button" aria-label="Subtitles">Subs</button>' +
+            '<button class="st-p-btn st-yt-btn st-p-back" type="button" aria-label="Close player">' + icon('x') + '</button>' +
+          '</div>' +
+        '</div>' +
+        '<section class="st-yt-reviews" aria-label="Reviews"><div class="st-yt-sec-head"><h3>Reviews</h3></div>' +
+          '<div class="st-yt-rev-view"><div class="st-yt-rev-track"></div></div>' +
+          '<div class="st-yt-rev-dots"></div></section>' +
       '</div>' +
-      '<video class="st-p-video" controls playsinline preload="auto"></video>' +
-      '<div class="st-gesture-ind" aria-hidden="true"></div>' +
-      '<div class="st-p-loading"><span class="st-p-spin"></span><i>Loading stream…</i></div>' +
-      '<div class="st-p-error hidden"><b>Stream failed</b><p></p>' +
-        '<button class="st-p-retry" type="button">Retry</button></div>' +
+      (ctx.isMovie ? '' :
+      '<aside class="st-yt-side" aria-label="Episodes">' +
+        '<div class="st-yt-countdown hidden"></div>' +
+        '<div class="st-yt-sec-head"><h3>Episodes</h3><span class="st-yt-epcount"></span></div>' +
+        '<div class="st-yt-eplist"></div>' +
+      '</aside>') +
       '<div class="st-p-menu hidden"></div>';
     document.body.appendChild(el);
     el.querySelector('.st-p-back').addEventListener('click', closePlayer);
     document.addEventListener('keydown', escClose);
+    buildYtReviews(el);
+    if (!ctx.isMovie) { buildYtEpisodes(el, ctx, n); buildYtCountdown(el); }
     return el;
   }
+  /* ----- YouTube-style: auto-scrolling reviews (every 6s) ----- */
+  function buildYtReviews(el) {
+    var d = (window.MPV2 && window.MPV2.getLastDetail) ? window.MPV2.getLastDetail() : null;
+    var revs = (d && d.reviews) || [];
+    var sec = el.querySelector('.st-yt-reviews');
+    if (!revs.length) {
+      sec.innerHTML = '<div class="st-yt-sec-head"><h3>Reviews</h3></div>' +
+        '<p class="st-yt-empty">No reviews yet.</p>';
+      return;
+    }
+    var track = sec.querySelector('.st-yt-rev-track');
+    var dotsBox = sec.querySelector('.st-yt-rev-dots');
+    track.innerHTML = revs.slice(0, 10).map(function (rv) {
+      var body = String(rv.body || '');
+      return '<article class="st-yt-rev-card">' +
+        '<div class="st-yt-rev-who"><b>' + esc(rv.user || 'Anonymous') + '</b>' +
+        (rv.score != null ? '<span>★ ' + esc(String(rv.score)) + '</span>' : '') + '</div>' +
+        (rv.summary ? '<p class="st-yt-rev-sum">' + esc(rv.summary) + '</p>' : '') +
+        '<p class="st-yt-rev-body">' + esc(body.slice(0, 280)) + (body.length > 280 ? '…' : '') + '</p></article>';
+    }).join('');
+    var cards = track.children.length, idx = 0, timer = null;
+    dotsBox.innerHTML = Array.prototype.map.call(track.children, function (_, i) {
+      return '<button type="button" data-dot="' + i + '" aria-label="Review ' + (i + 1) + '"></button>';
+    }).join('');
+    function go(i) {
+      idx = (i + cards) % cards;
+      track.style.transform = 'translateX(-' + (idx * 100) + '%)';
+      Array.prototype.forEach.call(dotsBox.children, function (dt, j) {
+        dt.classList.toggle('on', j === idx);
+      });
+    }
+    function play() { stop(); timer = setInterval(function () { go(idx + 1); }, 6000); }
+    function stop() { if (timer) clearInterval(timer); timer = null; }
+    el._ytRevStop = stop;
+    dotsBox.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-dot]');
+      if (b) { go(parseInt(b.getAttribute('data-dot'), 10)); play(); }
+    });
+    var view = sec.querySelector('.st-yt-rev-view');
+    view.addEventListener('pointerenter', stop);
+    view.addEventListener('pointerleave', play);
+    go(0); play();
+  }
+
+  /* ----- YouTube-style: episode sidebar with watch progress ----- */
+  function buildYtEpisodes(el, ctx, curN) {
+    var side = el.querySelector('.st-yt-side');
+    var total = ctx.episodes || 0;
+    if (!side || !total) { if (side) side.style.display = 'none'; return; }
+    var W = window.MPV2.Watch;
+    var prog = W ? W.getEpProgress(W.keyFor(ctx)) : {};
+    side.querySelector('.st-yt-epcount').textContent = total + ' eps';
+    var html = '';
+    for (var n = 1; n <= total; n++) {
+      var p = prog[n], pct = 0, done = false;
+      if (p && p.d > 0) { pct = Math.min(100, Math.round((p.p / p.d) * 100)); done = !!p.done; }
+      html += '<button type="button" class="st-yt-ep' + (n === curN ? ' cur' : '') +
+        '" data-ep="' + n + '">' +
+        '<span class="st-yt-ep-n">' + n + '</span>' +
+        '<span class="st-yt-ep-tx"><b>Episode ' + n + '</b>' +
+        '<span class="st-yt-ep-sub">' + (done ? 'Watched' : pct > 0 ? pct + '% watched' : 'Not started') + '</span></span>' +
+        '<span class="st-yt-ep-bar"><span style="width:' + pct + '%"></span></span></button>';
+    }
+    var list = side.querySelector('.st-yt-eplist');
+    list.innerHTML = html;
+    list.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-ep]');
+      if (b) {
+        var nn = parseInt(b.getAttribute('data-ep'), 10);
+        if (nn !== curN && el._ytGoEp) el._ytGoEp(nn);
+      }
+    });
+    var cur = list.querySelector('.st-yt-ep.cur');
+    if (cur) { try { cur.scrollIntoView({ block: 'center' }); } catch (e) {} }
+  }
+
+  /* ----- YouTube-style: next-episode release countdown ----- */
+  function buildYtCountdown(el) {
+    var d = (window.MPV2 && window.MPV2.getLastDetail) ? window.MPV2.getLastDetail() : null;
+    var na = d && d.nextAiring;
+    var box = el.querySelector('.st-yt-countdown');
+    if (!box || !na || !na.airingAt || na.airingAt <= Date.now()) return;
+    box.classList.remove('hidden');
+    function tick() {
+      var ms = na.airingAt - Date.now();
+      if (ms <= 0) {
+        box.innerHTML = '<b class="st-yt-cd-out">EP ' + esc(String(na.episode || '')) + '</b> is out now';
+        stop(); return;
+      }
+      var s = Math.floor(ms / 1000);
+      var dd = Math.floor(s / 86400), hh = Math.floor(s % 86400 / 3600),
+          mm = Math.floor(s % 3600 / 60), ss = s % 60;
+      function pad(x) { return (x < 10 ? '0' : '') + x; }
+      box.innerHTML = '<span class="st-yt-cd-label">EP ' + esc(String(na.episode || '?')) + ' drops in</span>' +
+        '<span class="st-yt-cd-boxes"><b>' + dd + '<i>d</i></b><b>' + pad(hh) + '<i>h</i></b>' +
+        '<b>' + pad(mm) + '<i>m</i></b><b>' + pad(ss) + '<i>s</i></b></span>';
+    }
+    function stop() { if (el._ytCdT) clearInterval(el._ytCdT); el._ytCdT = null; }
+    el._ytCdStop = stop;
+    el._ytCdT = setInterval(tick, 1000);
+    tick();
+  }
+
   function playerFail(shell, msg) {
     shell.querySelector('.st-p-loading').classList.add('hidden');
     var err = shell.querySelector('.st-p-error');

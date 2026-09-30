@@ -128,3 +128,113 @@
   }
   .st-p-menu { right: calc(12px + env(safe-area-inset-right, 0px)); }
 }
+
+/* ---------- YouTube-style player layout (split screen) ---------- */
+.st-player.st-yt {
+  display: flex; flex-direction: row; gap: 20px; padding: 20px;
+  overflow-y: auto; align-items: flex-start;
+  background: #000;
+}
+.st-yt-main { flex: 1 1 auto; min-width: 0; max-width: 1120px; }
+.st-yt-video-wrap {
+  position: relative; aspect-ratio: 16/9;
+  background: #000; border-radius: 12px; overflow: hidden;
+}
+.st-yt-video-wrap .st-p-video {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+}
+.st-yt-video-wrap .st-p-loading,
+.st-yt-video-wrap .st-p-error {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.st-yt-info { padding: 14px 4px 0; }
+.st-yt-series { margin: 0; font-size: 19px; font-weight: 700; line-height: 1.3; }
+.st-yt-ep-title { margin: 5px 0 12px; color: #9a9aa0; font-size: 13px; }
+.st-yt-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.st-p-btn.st-yt-btn {
+  border-radius: 999px; padding: 9px 16px;
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12);
+  color: #fff; font-size: 13px; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+}
+.st-p-btn.st-yt-btn:disabled { opacity: .35; cursor: default; }
+.st-p-btn.st-yt-btn svg { width: 16px; height: 16px; }
+.st-yt-sec-head { display: flex; align-items: baseline; gap: 10px; margin: 0 0 10px; }
+.st-yt-sec-head h3 { margin: 0; font-size: 16px; font-weight: 700; }
+.st-yt-epcount { color: #9a9aa0; font-size: 12px; }
+/* reviews carousel */
+.st-yt-reviews { margin-top: 20px; padding: 0 4px; }
+.st-yt-rev-view { overflow: hidden; border-radius: 12px; }
+.st-yt-rev-track { display: flex; transition: transform .5s ease; }
+.st-yt-rev-card {
+  flex: 0 0 100%; box-sizing: border-box;
+  padding: 14px 16px; background: rgba(255,255,255,.045);
+  border: 1px solid rgba(255,255,255,.07); border-radius: 12px;
+}
+.st-yt-rev-who { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.st-yt-rev-who b { font-size: 13px; }
+.st-yt-rev-who span { color: #ffb340; font-size: 12px; font-weight: 700; }
+.st-yt-rev-sum { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
+.st-yt-rev-body { margin: 0; font-size: 13px; line-height: 1.55; color: #c9c9d0; }
+.st-yt-rev-dots { display: flex; gap: 6px; justify-content: center; margin-top: 10px; }
+.st-yt-rev-dots button {
+  width: 7px; height: 7px; border-radius: 50%; border: 0; padding: 0;
+  background: #fff; opacity: .3; cursor: pointer;
+}
+.st-yt-rev-dots button.on { opacity: 1; }
+.st-yt-empty { color: #9a9aa0; font-size: 13px; margin: 0; }
+/* episode sidebar */
+.st-yt-side {
+  flex: 0 0 340px; width: 340px;
+  max-height: calc(100vh - 40px); max-height: calc(100dvh - 40px);
+  overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: 12px;
+  position: sticky; top: 0;
+}
+.st-yt-countdown {
+  padding: 12px 14px; border-radius: 12px;
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08);
+}
+.st-yt-cd-label { display: block; font-size: 12px; color: #9a9aa0; margin-bottom: 8px; }
+.st-yt-cd-boxes { display: flex; gap: 6px; }
+.st-yt-cd-boxes b {
+  min-width: 44px; text-align: center; padding: 8px 6px;
+  background: rgba(255,255,255,.07); border-radius: 8px;
+  font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.st-yt-cd-boxes b i { display: block; font-style: normal; font-size: 10px; font-weight: 600; color: #9a9aa0; }
+.st-yt-cd-out { font-size: 16px; }
+.st-yt-eplist { display: flex; flex-direction: column; gap: 4px; }
+.st-yt-ep {
+  display: flex; gap: 10px; align-items: center; width: 100%;
+  padding: 9px 10px; border-radius: 10px;
+  background: transparent; border: 0; color: inherit;
+  text-align: left; cursor: pointer;
+}
+.st-yt-ep:hover { background: rgba(255,255,255,.05); }
+.st-yt-ep.cur { background: rgba(255,255,255,.08); }
+.st-yt-ep-n {
+  flex: 0 0 30px; height: 30px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.08); font-size: 13px; font-weight: 700;
+}
+.st-yt-ep.cur .st-yt-ep-n { background: var(--tone, #b54aea); }
+.st-yt-ep-tx { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.st-yt-ep-tx b { font-size: 13px; font-weight: 600; }
+.st-yt-ep-sub { font-size: 11px; color: #9a9aa0; }
+.st-yt-ep-bar {
+  flex: 0 0 64px; height: 3px; border-radius: 2px;
+  background: rgba(255,255,255,.14); overflow: hidden;
+}
+.st-yt-ep-bar span { display: block; height: 100%; background: var(--tone, #b54aea); border-radius: 2px; }
+/* portrait phones / narrow: single column, sidebar becomes a section below */
+@media (max-width: 899px) {
+  .st-player.st-yt { flex-direction: column; padding: 12px; gap: 16px; }
+  .st-yt-main { max-width: none; width: 100%; }
+  .st-yt-side {
+    flex: none; width: 100%; max-height: none;
+    position: static; overflow: visible;
+  }
+  .st-yt-eplist { max-height: 420px; overflow-y: auto; overscroll-behavior: contain; }
+}

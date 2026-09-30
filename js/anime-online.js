@@ -40,6 +40,8 @@
   // Shared with stream.js (provider chooser) and app.js (rating/cast modals).
   window.MPV2.lockBodyScroll = lockBodyScroll;
   window.MPV2.unlockBodyScroll = unlockBodyScroll;
+  // Last loaded title detail (reviews, nextAiring) for the YouTube-style player.
+  window.MPV2.getLastDetail = function () { return lastDetail; };
 
   // Generic bottom-sheet modal. Reuses the .st-scrim/.st-dialog dialog chrome
   // from the provider chooser so popups look consistent.
