@@ -96,10 +96,18 @@
   /* -------------------- rating details + reviews popup -------------------- */
 
   // Simple AniList-flavoured markdown for review bodies.
+  // Review image attachments: AniList ~img420(URL)~ / img420(URL) and
+  // markdown ![alt](URL) become inline <img>; raw URL strings are removed.
+  function rvImg(url, alt) {
+    return '<img class="rv-img" loading="lazy" decoding="async" src="' + url +
+      '" alt="' + (alt || 'Review image') + '" onerror="this.style.display=\'none\'">';
+  }
   function rvMd(s) {
     var t = esc(s || '').trim();
     if (!t) return '';
     return t
+      .replace(/~?img\d*\((https?:[^)\s]+)\)~?/g, function (m, u) { return rvImg(u); })
+      .replace(/!\[([^\]]*)\]\((https?:[^)\s]+)\)/g, function (m, a, u) { return rvImg(u, a); })
       .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
       .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
       .replace(/__([^_]+)__/g, '<b>$1</b>')

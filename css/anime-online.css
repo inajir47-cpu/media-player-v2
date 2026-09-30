@@ -833,6 +833,10 @@ button.trailer-btn { cursor: pointer; font-family: inherit; }
 .rv-more { align-self: flex-start; font: inherit; font-size: 12px; font-weight: 700;
   color: #93c5fd; background: none; border: 0; padding: 2px 0; cursor: pointer; }
 .rv-empty { color: rgba(255,255,255,.5); font-size: 13px; }
+/* inline review image attachments (parsed from ~img420(URL)~ / ![alt](URL)) */
+.rv-img { display: block; max-width: 100%; height: auto; border-radius: 12px;
+  margin: 10px 0; border: 1px solid rgba(255,255,255,.1);
+  background: rgba(255,255,255,.04); }
 .rv-loading { display: flex; align-items: center; gap: 10px; color: rgba(255,255,255,.6);
   font-size: 13px; padding: 18px 0; }
 .rv-loading .spin { width: 18px; height: 18px; border-radius: 50%;
@@ -861,6 +865,7 @@ button.trailer-btn { cursor: pointer; font-family: inherit; }
 :root[data-theme="light"] .rv-summary,
 :root[data-theme="light"] .ch-pop-name { color: var(--text); }
 :root[data-theme="light"] .rv-text { color: var(--text); }
+:root[data-theme="light"] .rv-img { border-color: rgba(0,0,0,.12); background: rgba(0,0,0,.04); }
 :root[data-theme="light"] .rv-score-sub,
 :root[data-theme="light"] .rv-bar-score,
 :root[data-theme="light"] .rv-bar-n,

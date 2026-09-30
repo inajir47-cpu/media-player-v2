@@ -443,6 +443,21 @@ Obey this on every update. Updated 2026-09-30.
     Chromium 11/11 (computed styles, header pinned while body scrolls,
     dialog within 82vh, screenshots top+bottom states clean). NOT
     phone-tested — only Imran's device counts.
+26. 2026-09-30 — Review image attachments render inline (Imran approved the
+    exact diffs before apply; screenshots showed raw `~img420(URL)~` strings
+    in Rating & Reviews). `js/anime-online.js`: new `rvImg()` helper +
+    `rvMd()` now converts AniList `~img420(URL)~` / `img420(URL)` and
+    markdown `![alt](URL)` into lazy-loaded `<img class="rv-img">`
+    (async decoding, broken images hide via onerror); image passes run
+    BEFORE the link/bold/strike/spoiler passes so nothing collides, and
+    `esc()` still runs first so URLs stay attribute-safe. Raw HTML `<img>`
+    in reviews stays escaped (deliberate — un-escaping would open XSS).
+    `css/anime-online.css`: `.rv-img` OLED styling (block, max-width 100%,
+    12px radius, subtle border) + light-mode variant. Verified real
+    Chromium 9/9 with the shipped parser (3 tags → 3 imgs, zero raw text,
+    links/bold/strike intact, broken img hides, loaded img stays visible
+    within body, light-mode rule present). NOT phone-tested — only Imran's
+    device counts.
 
 ## Standing rules — obey on every update
 
