@@ -699,3 +699,16 @@ button.trailer-btn { cursor: pointer; font-family: inherit; }
 :root[data-theme="light"] .rv-card { background: rgba(23,23,21,.045);
   border-color: rgba(23,23,21,.12); }
 :root[data-theme="light"] .rv-avatar-fb { color: #fff; }
+/* Light mode: dialog chrome (title, subtitle, close, background, scrollbar) */
+:root[data-theme="light"] .st-dialog { background: rgba(255,255,255,.97);
+  border-color: rgba(23,23,21,.1); }
+:root[data-theme="light"] .st-head { background: rgb(255,255,255); }
+:root[data-theme="light"] .st-head h3,
+:root[data-theme="light"] .st-dialog h3 { color: var(--text); }
+:root[data-theme="light"] .st-head .st-sub,
+:root[data-theme="light"] .st-dialog .st-sub { color: var(--muted); }
+:root[data-theme="light"] .st-x { color: var(--text);
+  border-color: rgba(23,23,21,.14); background: rgba(23,23,21,.05); }
+:root[data-theme="light"] .st-dialog { scrollbar-color: rgba(23,23,21,.22) transparent; }
+:root[data-theme="light"] .st-dialog::-webkit-scrollbar-thumb { background: rgba(23,23,21,.22); }
+:root[data-theme="light"] .st-dialog::-webkit-scrollbar-thumb:hover { background: rgba(23,23,21,.34); }

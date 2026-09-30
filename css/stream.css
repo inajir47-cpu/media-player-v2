@@ -22,6 +22,23 @@
   border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.06); color:#fff; cursor:pointer;
   display:inline-flex; align-items:center; justify-content:center}
 .st-x .icon{width:14px; height:14px}
+
+/* Sticky modal header: title + close stay visible while scrolling */
+.st-head{position:sticky; top:0; z-index:5; display:flex;
+  align-items:flex-start; justify-content:space-between; gap:12px;
+  margin:-22px -18px 14px; padding:16px 18px 12px;
+  background:rgb(14,14,20); border-radius:20px 20px 0 0}
+.st-head-tx{min-width:0; flex:1}
+.st-head .st-x{position:static; flex:none}
+.st-head h3{margin:0 0 4px; font-size:19px; font-weight:800; color:#fff}
+.st-head .st-sub{margin:0; font-size:13px; color:rgba(255,255,255,.55)}
+
+/* Slim OLED-style scrollbar for modals (replaces bulky browser default) */
+.st-dialog{scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.18) transparent}
+.st-dialog::-webkit-scrollbar{width:8px}
+.st-dialog::-webkit-scrollbar-track{background:transparent}
+.st-dialog::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18); border-radius:8px}
+.st-dialog::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.3)}
 .st-provs{display:flex; flex-direction:column; gap:10px; margin-bottom:14px}
 .st-prov{display:flex; align-items:center; gap:12px; width:100%; text-align:left; cursor:pointer;
   padding:12px 14px; border-radius:14px; color:#fff; font:inherit;

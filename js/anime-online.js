@@ -34,9 +34,11 @@
     scrim.className = 'st-scrim';
     scrim.innerHTML =
       '<div class="st-dialog rv-dialog" role="dialog" aria-modal="true" aria-label="' + esc(title) + '">' +
-        '<button class="st-x" type="button" aria-label="Close">' + icon('x') + '</button>' +
-        '<h3>' + esc(title) + '</h3>' +
-        (sub ? '<p class="st-sub">' + esc(sub) + '</p>' : '') +
+        '<div class="st-head">' +
+          '<div class="st-head-tx"><h3>' + esc(title) + '</h3>' +
+          (sub ? '<p class="st-sub">' + esc(sub) + '</p>' : '') + '</div>' +
+          '<button class="st-x" type="button" aria-label="Close">' + icon('x') + '</button>' +
+        '</div>' +
         '<div class="rv-body">' + bodyHtml + '</div>' +
       '</div>';
     document.body.appendChild(scrim);
