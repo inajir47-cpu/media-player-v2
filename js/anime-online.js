@@ -1244,6 +1244,62 @@
     });
   }
 
+  // Manga resume button (chunk 3 refinement): a concise anime-style label —
+  // "Continue Ch N" for a partially-read chapter, "Read Ch N" for the next
+  // chapter after the last finished one — placed next to the Read globe.
+  // Painted once the MangaDex uuid resolves; the label refreshes live on
+  // mpv2:history, and the button hides when there is nothing to resume.
+  function mountResumeButton(mount, d) {
+    if ((d.mediaType || '') !== 'MANGA') return;
+    var actions = mount.querySelector('.detail-actions');
+    var MS = window.MPV2 && window.MPV2.MangaSource;
+    var MR = window.MPV2 && window.MPV2.MangaReader;
+    var A = window.MPV2 && window.MPV2.AnimeAPI;
+    if (!actions || !MS || !MR || !A ||
+        typeof A.mdMangaUuid !== 'function' || typeof MR.resumeInfo !== 'function') return;
+    var uuid = null, btn = null;
+    function paint() {
+      if (!actions.isConnected) {
+        document.removeEventListener('mpv2:history', onHist);
+        return;
+      }
+      var info = null;
+      try { info = uuid ? MR.resumeInfo(uuid) : null; } catch (e) {}
+      var show = info && info.ch && !(d.chapters && info.ch > d.chapters);
+      if (show) {
+        var label = (info.partial ? 'Continue Ch ' : 'Read Ch ') + info.ch;
+        if (!btn) {
+          btn = document.createElement('button');
+          btn.className = 'trailer-btn';
+          btn.type = 'button';
+          btn.setAttribute('data-md-resume', '');
+          var readBtn = actions.querySelector('[data-md-read]');
+          if (readBtn && readBtn.nextSibling) actions.insertBefore(btn, readBtn.nextSibling);
+          else actions.appendChild(btn);
+          btn.addEventListener('click', function () {
+            var cur = null;
+            try { cur = uuid ? MR.resumeInfo(uuid) : null; } catch (e) {}
+            if (cur && cur.ch) {
+              MS.openChapter({ title: d.title, malId: d.malId || null, image: d.image || '' },
+                             String(cur.ch));
+            }
+          });
+        }
+        btn.innerHTML = icon('play') + '<span>' + esc(label) + '</span>';
+        btn.setAttribute('aria-label', label + ' — ' + d.title);
+        btn.hidden = false;
+      } else if (btn) {
+        btn.hidden = true;
+      }
+    }
+    function onHist() { paint(); }
+    document.addEventListener('mpv2:history', onHist);
+    A.mdMangaUuid(d.malId || null, d.title || '').then(function (u) {
+      uuid = u || '';
+      paint();
+    }).catch(function () {});
+  }
+
   window.MPV2.renderOnlineDetail = function (sectionId, provider, id, mediaType) {
     var sec = window.MPV2.SECTIONS[sectionId] || window.MPV2.SECTIONS[SEC_ID];
     var mount = document.querySelector('#view') || document.querySelector('#app');
@@ -1277,6 +1333,8 @@
           });
         });
       }
+      // Manga resume button: concise "Continue Ch N" / "Read Ch N".
+      mountResumeButton(mount, d);
       ensureCountdownTicker();
       window.scrollTo(0, 0);
     }).catch(function (err) {

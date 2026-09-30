@@ -160,6 +160,24 @@
     }
     return out;
   }
+  /* Resume target for the detail-page button: { ch, partial }.
+   * Partially-read chapter wins (partial:true -> "Continue Ch N");
+   * otherwise the chapter after the last finished one (partial:false -> "Read Ch N").
+   * ch is null when there is nothing to resume. */
+  function resumeInfo(uuid) {
+    var map = progressByChapter(uuid), k, r, n;
+    var resume = null, maxDone = 0;
+    for (k in map) {
+      if (!map.hasOwnProperty(k)) continue;
+      r = map[k]; n = parseFloat(k);
+      if (!(n > 0) || !r) continue;
+      if (r.done) { if (n > maxDone) maxDone = n; }
+      else if (r.p > 0 && (resume == null || n < resume)) resume = n;
+    }
+    if (resume != null) return { ch: resume, partial: true };
+    if (maxDone > 0) return { ch: maxDone + 1, partial: false };
+    return { ch: null, partial: false };
+  }
   /* Most recently touched chapter for a manga (continue-reading entry point). */
   function lastRead(uuid) {
     if (!uuid) return null;
@@ -413,6 +431,7 @@
     getChProgress: getChProgress,
     saveChProgress: saveChProgress,
     progressByChapter: progressByChapter,
+    resumeInfo: resumeInfo,
     lastRead: lastRead
   };
 })();
