@@ -1268,6 +1268,15 @@
       whenStreamReady(function (S) { S.wireDetail(mount, provider, id, d, mediaType); });
       var woBtn = mount.querySelector('[data-watch-order]');
       if (woBtn) woBtn.addEventListener('click', function () { openWatchOrder(provider, d); });
+      // Chunk 2 (manga): header globe opens the source/provider dialog.
+      var mdReadBtn = mount.querySelector('[data-md-read]');
+      if (mdReadBtn && window.MPV2 && window.MPV2.MangaSource) {
+        mdReadBtn.addEventListener('click', function () {
+          window.MPV2.MangaSource.openSourceDialog({
+            title: d.title, malId: d.malId || null, image: d.image || ''
+          });
+        });
+      }
       ensureCountdownTicker();
       window.scrollTo(0, 0);
     }).catch(function (err) {
@@ -1319,6 +1328,11 @@
     var watchOrder = (!isManga && ((d.relations && d.relations.length) || d.nextAiring))
       ? '<button class="trailer-btn wo-btn" data-watch-order aria-label="Watch Order">' + icon('list') +
         '<span>Watch Order</span></button>' : '';
+    // Chunk 2 (manga): prominent globe in the header action row — opens the
+    // manga source/provider dialog, mirroring the anime streaming flow.
+    var readBtn = isManga
+      ? '<button class="trailer-btn" data-md-read aria-label="Read manga">' + icon('globe') +
+        '<span>Read</span></button>' : '';
     var coming = d.startTs && d.startTs > Date.now()
       ? '<div class="detail-coming"><span class="coming-label">COMING SOON</span>' +
         cdBoxesHtml(d.startTs, true) + '</div>' : '';
@@ -1363,8 +1377,8 @@
           studios +
           '<div class="genre-tags">' + (d.genres || []).map(function (g) {
             return '<span class="genre-tag">' + esc(g) + '</span>';
-          }).join('') + '</div>' + (trailer || watchOrder
-            ? '<div class="detail-actions">' + trailer + watchOrder + '</div>' : '') +
+          }).join('') + '</div>' + (trailer || watchOrder || readBtn
+            ? '<div class="detail-actions">' + readBtn + trailer + watchOrder + '</div>' : '') +
           coming + '</div></header>' +
         '<section class="online-block"><h2>Synopsis</h2><p class="synopsis">' +
           esc(d.synopsis || 'No synopsis available.') + '</p></section>' +
@@ -1558,11 +1572,24 @@
     }
     block.addEventListener('click', function (e) {
       var b = e.target.closest('[data-ep-watched]');
-      if (!b) return;
-      var card = b.closest('.episode-card');
-      var on = !card.classList.contains('watched');
-      card.classList.toggle('watched', on);
-      setEpWatched(b.getAttribute('data-ep-watched'), on);
+      if (b) {
+        var wcard = b.closest('.episode-card');
+        var on = !wcard.classList.contains('watched');
+        wcard.classList.toggle('watched', on);
+        setEpWatched(b.getAttribute('data-ep-watched'), on);
+        return;
+      }
+      // Chunk 2 (manga): tapping a chapter card opens the reader. The pencil
+      // (read-status) toggle above keeps its own behaviour, and external
+      // links are left alone.
+      if (isCh && !e.target.closest('a')) {
+        var chCard = e.target.closest('.episode-card[data-ch-n]');
+        if (chCard && window.MPV2 && window.MPV2.MangaSource) {
+          window.MPV2.MangaSource.openChapter({
+            title: d.title, malId: d.malId || null, image: d.image || ''
+          }, chCard.getAttribute('data-ch-n'), chCard);
+        }
+      }
     });
     // Keep episode states fresh: when the player saves progress (mpv2:history),
     // update watched badges + progress bars in place so returning from the

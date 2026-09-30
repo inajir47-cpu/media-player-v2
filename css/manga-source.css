@@ -1,0 +1,7 @@
+/* Manga source layer (chunk 2): chapter-card loading state + dialog polish. */
+.episode-card.ch-loading{position:relative; pointer-events:none; opacity:.55}
+.episode-card.ch-loading::after{content:""; position:absolute; inset:0; margin:auto;
+  width:26px; height:26px; border-radius:50%;
+  border:3px solid rgba(124,58,237,.25); border-top-color:#7c3aed;
+  animation:md-ch-spin .7s linear infinite}
+@keyframes md-ch-spin{to{transform:rotate(360deg)}}
