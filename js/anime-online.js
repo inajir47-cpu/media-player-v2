@@ -177,7 +177,12 @@
     var roles = (v.roles || []).length
       ? '<h4 class="rv-sec">Notable roles</h4><div class="ch-pop-grid">' +
         v.roles.map(function (r) {
-          return '<div class="ch-pop-item"><img src="' + esc(r.image) + '" alt="' + esc(r.name) +
+          var cAttr = r.id
+            ? ' data-char-provider="' + esc(lastDetailProvider) + '" data-char-id="' + esc(String(r.id)) +
+              '" data-char-name="' + esc(r.name || '') +
+              '" tabindex="0" role="link" aria-label="' + esc(r.name) + ' details"'
+            : '';
+          return '<div class="ch-pop-item' + (r.id ? ' is-link' : '') + '"' + cAttr + '><img src="' + esc(r.image) + '" alt="' + esc(r.name) +
             '" loading="lazy"><span>' + esc(r.name) + '</span></div>';
         }).join('') + '</div>' : '';
     return '<header class="ch-pop-hero"><span class="poster-img big"><img src="' + esc(v.image) +
@@ -1757,7 +1762,7 @@
         (mKind === 'manga' ? 'manga/' : '') + encodeURIComponent(media.getAttribute('data-media-id'));
       return;
     }
-    var card = e.target.closest('.online-cast[data-char-id]');
+    var card = e.target.closest('[data-char-id]');
     if (card) {
       // Character info opens in a popup, not a full page. Details are
       // prefetched when the title page loads, so this opens instantly.
@@ -1787,7 +1792,7 @@
       return;
     }
     if ((e.key === 'Enter' || e.key === ' ') && e.target.classList &&
-        e.target.classList.contains('online-cast') && e.target.hasAttribute('data-char-id')) {
+        e.target.hasAttribute('data-char-id')) {
       e.preventDefault();
       e.target.click();
     }
