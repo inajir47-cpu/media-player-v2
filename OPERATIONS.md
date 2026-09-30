@@ -289,8 +289,42 @@ Obey this on every update. Updated 2026-09-30.
     element), nhentai 18+ gate intact with enriched ctx in history, reanime
     routing unchanged, ext-confirm popup still `#0a0a0c`/`#232326`,
     `--tone` set from the poster. Screenshot: `v2-godmode-detail.png`.
-    Local commit, NOT pushed (needs fresh PAT). Phone test pending —
-    only Imran's device counts.
+    Pushed 2026-09-30 (`928c030..b037d75` on main; Render auto-deploys).
+    Phone test pending — only Imran's device counts.
+19. 2026-09-30 — Conditional "Hentai" genre chip with direct adult-provider
+    routing (Imran approved exact plan, then confirmed apply).
+    `js/anime-online.js` only (+57 lines, no other file touched):
+    - New `HENTAI_GENRE = '__hentai__'` sentinel (can never collide with a
+      real meta-API genre).
+    - `genreHtml()`: appends the "Hentai" chip only when `adultAllowed()`
+      (the 18+ Settings opt-in) is on; 18+ off → chip never rendered. The
+      one shared builder covers both the Discover block (Animation home)
+      and the Manga tab.
+    - `loadGenre()`: new branch at the top — when the sentinel genre is
+      active it calls `loadHentaiGenre()` and never reaches
+      `API().byGenre()` (AniList/Jikan/Kitsu are never queried). If the
+      18+ opt-in was switched off mid-browse, it falls back to 'Action'.
+      All call sites (chip tap, sort pill, retry, infinite-scroll sentinel)
+      route through this branch.
+    - New `loadHentaiGenre()`: queries `window.nhSearch('hentai')` and
+      `window.htSearch('hentai')` in parallel (same adult pair God Mode
+      uses), renders results with the existing `godCard()` builder (18+
+      badge + server tag), `state.hasMore = false` so the sentinel stays
+      quiet (provider search is single-page).
+    - `wireDiscover()` click handler: new `[data-god-kind]` delegation at
+      the top routes card taps to `window.MPV2.openGodCard()` — the exact
+      18+ warning → reader pipeline, unchanged.
+    No CSS, provider, settings, or theme changes (reuses `.chip` and
+    `.god-card` styles).
+    Verified: real Chromium **11/11** with canned nhentai/Hitomi
+    responses — chip hidden with 18+ off, visible with 18+ on (Discover
+    + Manga), Hentai click calls nhSearch + htSearch with zero
+    AniList/Jikan traffic, grid renders 2 nhentai + 1 hitomi cards with
+    18+ badges, card tap shows the 18+ warning (no auto-reader), Proceed
+    opens the reader with provider pages, mid-browse 18+ opt-out falls
+    back to Action with no adult call, normal Action genre still uses
+    byGenre. Local commit, NOT pushed (needs fresh PAT). Phone test
+    pending — only Imran's device counts.
 
 ## Standing rules — obey on every update
 

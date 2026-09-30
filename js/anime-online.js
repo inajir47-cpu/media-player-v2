@@ -846,11 +846,21 @@
 
   /* ------------------------------ genres -------------------------------- */
 
+  // Sentinel genre value for the conditional 18+ "Hentai" chip. Never
+  // collides with a real meta-API genre; handled entirely by the adult
+  // provider pipeline (never reaches AniList/Jikan/Kitsu).
+  var HENTAI_GENRE = '__hentai__';
+
   function genreHtml() {
     var chips = API().GENRES.map(function (g) {
       return '<button class="chip' + (state.genre === g ? ' active' : '') +
         '" data-genre="' + esc(g) + '">' + esc(g) + '</button>';
     }).join('');
+    // 18+ opt-in ON: show the Hentai chip. Opt-in OFF: stays hidden.
+    if (adultAllowed()) {
+      chips += '<button class="chip' + (state.genre === HENTAI_GENRE ? ' active' : '') +
+        '" data-genre="' + HENTAI_GENRE + '">Hentai</button>';
+    }
     var sorts = [['popularity', 'Popularity'], ['score', 'Score'], ['latest', 'Latest']]
       .map(function (s) {
         return '<button class="pill small' + (state.sort === s[0] ? ' active' : '') +
@@ -873,6 +883,13 @@
   }
 
   function loadGenre(root, append) {
+    // Hentai chip: bypass the meta-APIs completely — route to the adult
+    // provider pipeline instead. If the 18+ opt-in was switched off
+    // mid-browse, fall back to a normal genre rather than leaking the chip.
+    if (state.genre === HENTAI_GENRE) {
+      if (!adultAllowed()) { state.genre = 'Action'; }
+      else return loadHentaiGenre(root, append);
+    }
     var grid = root.querySelector('#genreGrid');
     var sentinel = root.querySelector('#genreSentinel');
     if (state.loading) return;
@@ -890,6 +907,39 @@
       grid.innerHTML = state.items.length
         ? state.items.map(onlineCard).join('')
         : emptyState('info', 'No titles found', 'Try another genre or provider.');
+    }).catch(function (err) {
+      state.loading = false;
+      if (sentinel) sentinel.classList.remove('loading');
+      if (!grid.isConnected) return;
+      if (!append) grid.innerHTML = errorHtml(err);
+    });
+  }
+
+  // Hentai genre: fetch directly from the adult provider pipeline in
+  // parallel (nhentai + Hitomi), the same pair God Mode search uses.
+  // No AniList/Jikan/Kitsu call is ever made for this genre.
+  function loadHentaiGenre(root, append) {
+    var grid = root.querySelector('#genreGrid');
+    var sentinel = root.querySelector('#genreSentinel');
+    if (state.loading) return;
+    if (!append) grid.innerHTML = skeletonCards(6);
+    state.loading = true;
+    if (sentinel) sentinel.classList.add('loading');
+    var jobs = [];
+    if (typeof window.nhSearch === 'function') jobs.push(window.nhSearch('hentai'));
+    if (typeof window.htSearch === 'function') jobs.push(window.htSearch('hentai'));
+    Promise.all(jobs).then(function (lists) {
+      state.loading = false;
+      if (sentinel) sentinel.classList.remove('loading');
+      if (!grid.isConnected) return;
+      var items = [];
+      lists.forEach(function (l) { items = items.concat(l || []); });
+      if (!append) state.items = [];
+      state.items = state.items.concat(items);
+      state.hasMore = false; // provider search is single-page; sentinel stays quiet
+      grid.innerHTML = state.items.length
+        ? state.items.map(godCard).join('')
+        : emptyState('info', 'No titles found', 'The adult provider returned nothing. Try again later.');
     }).catch(function (err) {
       state.loading = false;
       if (sentinel) sentinel.classList.remove('loading');
@@ -1047,6 +1097,13 @@
 
   function wireDiscover(sec, root) {
     root.addEventListener('click', function (e) {
+      // Adult provider cards (Hentai genre grid): route taps through the
+      // 18+ warning into the reader — the same pipeline God Mode uses.
+      var gc = e.target.closest ? e.target.closest('[data-god-kind]') : null;
+      if (gc) {
+        if (window.MPV2.openGodCard) window.MPV2.openGodCard(gc);
+        return;
+      }
       // Recently Viewed X (anime + manga rows): instant remove, never navigates.
       var rvx = e.target.closest('[data-rv-remove]');
       if (rvx) {
