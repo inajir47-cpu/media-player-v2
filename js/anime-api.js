@@ -203,6 +203,16 @@
              year: sd.year || null, format: node.format || null,
              kind: kindOverride || frKind(relationType, node.format) };
   }
+  // Chronological watch order: oldest release year first. The explicit index
+  // tiebreak keeps the sort stable — same-year items retain chain order
+  // (prequels, this title, sequels, then side entries). Unknown years sort last.
+  function frSortChrono(cards) {
+    var decorated = cards.map(function (c, i) { return { c: c, i: i }; });
+    decorated.sort(function (a, b) {
+      return ((a.c.year || 9999) - (b.c.year || 9999)) || (a.i - b.i);
+    });
+    return decorated.map(function (x) { return x.c; });
+  }
   function alFranchiseRels(id, t) {
     // 48h-persistent like detail (api48), so repeat franchise views are free.
     var key = 'r:v2:anilist:' + t + ':' + id;
@@ -252,8 +262,7 @@
         for (var i = bwd.length - 1; i >= 0; i--) list.push(bwd[i].card);
         list.push(selfCard);
         for (var j = 0; j < fwd.length; j++) list.push(fwd[j].card);
-        sides.sort(function (a, b) { return (a.year || 9999) - (b.year || 9999); });
-        return list.concat(sides);
+        return frSortChrono(list.concat(sides));
       })
       .catch(function () { return fallback; });
   }
@@ -301,10 +310,10 @@
         var selfCard = { id: m.id, title: item.title, image: item.image,
                          episodes: item.episodes, year: item.year, kind: 'This season',
                          format: m.format || null };
-        item.seasons = [selfCard].concat(rels
+        item.seasons = frSortChrono([selfCard].concat(rels
           .filter(function (e) { return e && e.node &&
             (e.relationType === 'SEQUEL' || e.relationType === 'PREQUEL'); })
-          .map(function (e) { return frCard(e.node, e.relationType); }));
+          .map(function (e) { return frCard(e.node, e.relationType); })));
         item.characters = ((m.characters && m.characters.edges) || [])
           .sort(function (x, y) { return roleWeight(x.role) - roleWeight(y.role); })
           .slice(0, 12).map(function (e) {

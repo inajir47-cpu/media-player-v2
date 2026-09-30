@@ -535,6 +535,19 @@ Obey this on every update. Updated 2026-09-30.
     franchise-strip.png. Jikan left as-is (its relations are already
     unfiltered anime-only; no multi-hop to respect its strict rate limits).
     NOT phone-tested — only Imran's device counts.
+31. 2026-09-30 — Franchise strip: chronological release-date sorting. The
+    strip now sorts ALL franchise nodes oldest-to-newest by air year via the
+    new `frSortChrono()` in `js/anime-api.js` (decorated sort with explicit
+    index tiebreak — same-year items keep chain order: prequels, this title,
+    sequels, then side entries; unknown years sink to the end). Applied to
+    both the transitive-walk result and the instant fallback in
+    `anilistDetail()`, so both paths order identically. The "This season" card
+    now sits at its own release year (identified by its kind label) instead of
+    being pinned first. Verified in real Chromium with the KonoSuba-like
+    chain: S1 (2016), OVA (2016), S2 (2017), Movie (2019), S3 (2024) — the OVA
+    correctly interleaves ahead of S2, proving true chronological order.
+    Screenshot: franchise-strip-chrono.png. NOT phone-tested — only Imran's
+    device counts.
 
 ## Standing rules — obey on every update
 
