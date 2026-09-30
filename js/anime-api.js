@@ -187,7 +187,7 @@
         ' relations{edges{relationType node{id title{romaji english} coverImage{large} averageScore status' +
         ' startDate{year month day} episodes chapters format}}}' +
         ' characters(perPage:25){edges{role node{id name{full} image{large}}' +
-        ' voiceActors(language:JAPANESE){name{full} image{large}}}}}}',
+        ' voiceActors(language:JAPANESE){id name{full} image{large}}}}}}',
         { id: parseInt(id, 10), t: t }
       ).then(function (d) {
         var m = d.Media;
@@ -231,7 +231,7 @@
                    name: (e.node.name && e.node.name.full) || '?',
                    image: (e.node.image && e.node.image.large) || '',
                    role: e.role === 'MAIN' ? 'Main' : 'Supporting',
-                   va: va ? { name: va.name.full || '?', image: (va.image && va.image.large) || '' } : null };
+                   va: va ? { id: va.id || null, name: va.name.full || '?', image: (va.image && va.image.large) || '' } : null };
         });
         item.relations = rels.slice(0, 12).map(function (e) {
           var rsd = e.node.startDate || {};
@@ -287,7 +287,7 @@
           ((e.voiceActors) || []).forEach(function (v) {
             if (v && v.id && !seen[v.id]) {
               seen[v.id] = 1;
-              vas.push({ name: (v.name && v.name.full) || '?',
+              vas.push({ id: v.id || null, src: 'anilist', name: (v.name && v.name.full) || '?',
                          image: (v.image && v.image.large) || '' });
             }
           });
@@ -478,7 +478,7 @@
           var p = v.person || {};
           if (p.mal_id && !seen[p.mal_id]) {
             seen[p.mal_id] = 1;
-            vas.push({ name: p.name || '?',
+            vas.push({ id: p.mal_id || null, src: 'jikan', name: p.name || '?',
                        image: (((p.images || {}).jpg) || {}).image_url || '' });
           }
         });
@@ -1058,6 +1058,65 @@
         if (p === 'anilist' && name) {
           return jikanCharacterByName(name).then(function (c) { return save('jikan', c); },
             function () { throw err; });
+        }
+        throw err;
+      });
+    },
+    staffDetail: function (provider, id, name, src) {
+      var p = PROVIDERS[provider] ? provider : getProvider();
+      var ssrc = src || 'anilist';
+      var key = 'staff:' + p + ':' + ssrc + ':' + id;
+      var hit = charCacheGet(key);
+      if (hit) return Promise.resolve(hit);
+      function save(v) { charCacheSet(key, v); return v; }
+      if (ssrc === 'jikan') {
+        return jkGet('/people/' + id + '/full').then(function (j) {
+          var s = j.data || {};
+          var roles = ((s.voices || []).slice(0, 10)).map(function (v) {
+            var c = v.character || {};
+            return { id: c.mal_id || null, name: c.name || '?',
+                     image: (((c.images || {}).jpg) || {}).image_url || '', role: v.role || '' };
+          });
+          return save({ id: s.mal_id || null, name: s.name || '?',
+            native: s.name_kanji || '', image: ((((s.images || {}).jpg) || {}).image_url) || '',
+            description: (s.about || '').trim(), age: null,
+            birthday: s.birthday || null, gender: null, bloodType: s.blood_type || null,
+            occupations: null, favourites: s.favorites || 0,
+            roles: roles, _src: 'jikan' });
+        });
+      }
+      return alQuery(
+        'query ($id: Int) { Staff(id: $id) {' +
+        ' id name{full native} image{large} description(asHtml:false)' +
+        ' age dateOfBirth{year month day} gender bloodType primaryOccupations favourites' +
+        ' characters(perPage:10 sort:FAVOURITES_DESC){edges{voiceActorRole' +
+        '  node{id name{full} image{large}}}}}}',
+        { id: parseInt(id, 10) }
+      ).then(function (d) {
+        var s = d.Staff || {};
+        var dob = s.dateOfBirth || {};
+        var roles = ((s.characters && s.characters.edges) || []).map(function (e) {
+          var n = e.node || {};
+          return { id: n.id || null, name: (n.name && n.name.full) || '?',
+                   image: (n.image && n.image.large) || '', role: e.voiceActorRole || '' };
+        });
+        return save({ id: s.id || null, name: (s.name && s.name.full) || '?',
+          native: (s.name && s.name.native) || '',
+          image: (s.image && s.image.large) || '',
+          description: (s.description || '').trim(),
+          age: s.age || null,
+          birthday: [dob.day, dob.month, dob.year].filter(Boolean).join('/') || null,
+          gender: s.gender || null, bloodType: s.bloodType || null,
+          occupations: (s.primaryOccupations || []).join(', ') || null,
+          favourites: s.favourites || 0, roles: roles, _src: 'anilist' });
+      }, function (err) {
+        // AniList failed: try Jikan people search by name as backup.
+        if (name) {
+          return jkGet('/people?q=' + encodeURIComponent(name) + '&limit=1').then(function (j) {
+            var s = ((j.data || [])[0]) || {};
+            if (!s.mal_id) throw err;
+            return AnimeAPI.staffDetail(p, s.mal_id, s.name, 'jikan');
+          }, function () { throw err; });
         }
         throw err;
       });

@@ -127,11 +127,15 @@
             '" loading="lazy"><span>' + esc(a.title) + '</span></div>';
         }).join('') + '</div>' : '';
     var vas = (c.vas || []).length
-      ? '<h4 class="rv-sec">Voice actors</h4><div class="cast-grid">' +
+      ? '<h4 class="rv-sec">Voice actors</h4><div class="va-grid">' +
         c.vas.map(function (v) {
-          return '<div class="cast-card"><img class="cast-card-photo" src="' + esc(v.image) +
-            '" alt="' + esc(v.name) + '" loading="lazy">' +
-            '<div class="cast-card-copy"><strong>' + esc(v.name) + '</strong>' +
+          var attr = v.id
+            ? ' data-va-provider="' + esc(lastDetailProvider) + '" data-va-id="' + esc(String(v.id)) +
+              '" data-va-name="' + esc(v.name) + '" data-va-src="' + esc(v.src || 'anilist') +
+              '" tabindex="0" role="link" aria-label="' + esc(v.name) + ' profile"' : '';
+          return '<div class="va-card' + (v.id ? ' is-link' : '') + '"' + attr + '>' +
+            '<img src="' + esc(v.image) + '" alt="' + esc(v.name) + '" loading="lazy">' +
+            '<div class="va-card-copy"><strong>' + esc(v.name) + '</strong>' +
             '<span>Japanese</span></div></div>';
         }).join('') + '</div>' : '';
     return '<header class="ch-pop-hero"><span class="poster-img big"><img src="' + esc(c.image) +
@@ -150,6 +154,48 @@
       if (body && body.isConnected) body.innerHTML = characterPopupHtml(c);
     }).catch(function () {
       if (body && body.isConnected) body.innerHTML = '<p class="rv-empty">Could not load character info.</p>';
+    });
+  }
+
+  /* ---------------------- voice actor profile popup ------------------------ */
+
+  function vaPopupHtml(v) {
+    var facts = [];
+    if (v.age) facts.push('Age ' + esc(String(v.age)));
+    if (v.birthday) facts.push('Born ' + esc(v.birthday));
+    if (v.gender) facts.push(esc(v.gender));
+    if (v.bloodType) facts.push('Blood type ' + esc(v.bloodType));
+    if (v.occupations) facts.push(esc(v.occupations));
+    if (v.favourites) facts.push(esc(String(v.favourites).replace(/\B(?=(\d{3})+(?!\d))/g, ',')) + ' favourites');
+    var roles = (v.roles || []).length
+      ? '<h4 class="rv-sec">Notable roles</h4><div class="ch-pop-grid">' +
+        v.roles.map(function (r) {
+          return '<div class="ch-pop-item"><img src="' + esc(r.image) + '" alt="' + esc(r.name) +
+            '" loading="lazy"><span>' + esc(r.name) + '</span></div>';
+        }).join('') + '</div>' : '';
+    return '<header class="ch-pop-hero"><span class="poster-img big"><img src="' + esc(v.image) +
+      '" alt="' + esc(v.name) + '"></span>' +
+      '<div class="detail-copy"><h1 class="ch-pop-name">' + esc(v.name) + '</h1>' +
+      (v.native ? '<p class="detail-meta dim">' + esc(v.native) + '</p>' : '') +
+      (facts.length ? '<ul class="va-facts">' +
+        facts.map(function (f) { return '<li>' + f + '</li>'; }).join('') + '</ul>' : '') +
+      '</div></header>' +
+      (v.description
+        ? '<h4 class="rv-sec">About</h4><div class="rv-text"><p class="rv-p">' +
+          esc(v.description).replace(/\n\n+/g, '</p><p class="rv-p">') + '</p></div>' : '') +
+      roles +
+      (v._src === 'jikan' ? '<p class="demo-note">via backup source</p>' : '');
+  }
+
+  function openVaPopup(provider, id, name, src) {
+    var scrim = openPopup(name || 'Voice actor', providerName(),
+      '<div class="rv-loading"><span class="spin"></span>Loading…</div>');
+    var body = scrim.querySelector('.rv-body');
+    API().staffDetail(provider, id, name, src).then(function (v) {
+      if (body && body.isConnected) body.innerHTML = vaPopupHtml(v);
+    }).catch(function () {
+      if (body && body.isConnected)
+        body.innerHTML = '<p class="rv-empty">Could not load this voice actor right now.</p>';
     });
   }
 
@@ -906,7 +952,10 @@
     var vaLine = c.va ? '<span>' + esc(c.role) + ' · ' + esc(c.va.name) + '</span>' +
       '<small>Voice · Japanese</small>' : '<span>' + esc(c.role) + '</span>';
     var vaPhoto = c.va && c.va.image
-      ? '<img class="cast-va-photo" src="' + esc(c.va.image) + '" alt="' + esc(c.va.name) + '" loading="lazy">'
+      ? '<img class="cast-va-photo' + (c.va.id ? ' is-link' : '') + '" src="' + esc(c.va.image) + '" alt="' + esc(c.va.name) + '" loading="lazy"' +
+        (c.va.id ? ' data-va-provider="' + esc(provider) + '" data-va-id="' + esc(String(c.va.id)) +
+          '" data-va-name="' + esc(c.va.name) + '" data-va-src="anilist"' +
+          ' tabindex="0" role="link" aria-label="' + esc(c.va.name) + ' profile"' : '') + '>'
       : '<span class="cast-card-arrow">' + icon('chevron') + '</span>';
     var link = c.id && provider
       ? ' data-char-provider="' + esc(provider) + '" data-char-id="' + esc(String(c.id)) +
@@ -1678,6 +1727,15 @@
       if (lastDetail) openReviewsPopup(lastDetail);
       return;
     }
+    // Voice actor avatars open the VA profile popup (checked first: avatars
+    // sit inside character cards, so this must run before the card check).
+    var va = e.target.closest('[data-va-id]');
+    if (va) {
+      openVaPopup(va.getAttribute('data-va-provider') || lastDetailProvider,
+        va.getAttribute('data-va-id'), va.getAttribute('data-va-name') || '',
+        va.getAttribute('data-va-src') || 'anilist');
+      return;
+    }
     var card = e.target.closest('.online-cast[data-char-id]');
     if (card) {
       // Character info opens in a popup, not a full page. Details are
@@ -1692,6 +1750,14 @@
     }
   });
   document.addEventListener('keydown', function (e) {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.classList &&
+        e.target.hasAttribute('data-va-id')) {
+      e.preventDefault();
+      openVaPopup(e.target.getAttribute('data-va-provider') || lastDetailProvider,
+        e.target.getAttribute('data-va-id'), e.target.getAttribute('data-va-name') || '',
+        e.target.getAttribute('data-va-src') || 'anilist');
+      return;
+    }
     if ((e.key === 'Enter' || e.key === ' ') && e.target.classList &&
         e.target.classList.contains('online-cast') && e.target.hasAttribute('data-char-id')) {
       e.preventDefault();

@@ -407,8 +407,12 @@
   border-radius:50%; background:var(--poster, var(--tone))}
 @media (max-width:560px){
   .cast-list{grid-template-columns:1fr}
-  .cast-card{grid-template-columns:68px minmax(0,1fr) 28px}
-  .cast-card-photo{width:68px; height:80px}
+  /* Mobile: clean cards — character image + name + tappable VA avatar only */
+  .cast-card{grid-template-columns:60px minmax(0,1fr) auto; gap:10px; padding:8px}
+  .cast-card-photo{width:60px; height:72px}
+  .cast-card-copy strong{font-size:16px}
+  .cast-card-copy span, .cast-card-copy small{display:none}
+  .cast-va-photo{width:34px; height:34px}
   .cast-profile-modal{grid-template-columns:1fr; padding:0}
   .cast-profile-image-wrap{max-height:300px; overflow:hidden}
   .cast-profile-image{min-height:0; height:300px}

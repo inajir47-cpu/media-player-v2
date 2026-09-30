@@ -294,6 +294,24 @@ button.trailer-btn { cursor: pointer; font-family: inherit; }
 .spoiler { background: rgba(255,255,255,.16); border-radius: 6px; padding: 1px 6px; }
 .cast-va-photo { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; background: #1a1a1d;
   border: 1px solid rgba(255,255,255,.14); flex: none; }
+.cast-va-photo.is-link { cursor: pointer; }
+
+/* Voice actor cards inside the character popup: compact, clean ellipsis */
+.va-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+@media (min-width: 700px) { .va-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.va-card { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 8px 10px;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.va-card.is-link { cursor: pointer; }
+.va-card img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover;
+  flex: none; background: #1a1a1d; }
+.va-card-copy { min-width: 0; flex: 1; }
+.va-card-copy strong { display: block; font-size: 13px; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.va-card-copy span { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
+/* VA profile fact pills */
+.va-facts { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.va-facts li { font-size: 11px; color: var(--muted); background: rgba(127,127,127,.12);
+  border-radius: 999px; padding: 3px 10px; }
 
 /* settings: provider note */
 .provider-note { font-size: 12.5px; color: var(--muted, #8e8e93); line-height: 1.55; margin: 10px 0 0; }
@@ -317,11 +335,11 @@ button.trailer-btn { cursor: pointer; font-family: inherit; }
     gap: 0 14px;
     align-items: start;
   }
-  .detail-copy { display: contents; }
+  .detail-hero .detail-copy { display: contents; }
   /* Restore text/buttons above the background video layer.
      (display:contents broke the desktop z-index rule which only
      targets direct children of .detail-hero.) */
-  .detail-copy > * { position: relative; z-index: 1; }
+  .detail-hero .detail-copy > * { position: relative; z-index: 1; }
 
   .detail-hero > .poster-img.big {
     grid-column: 1;
