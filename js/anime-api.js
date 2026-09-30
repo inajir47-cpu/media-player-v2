@@ -1037,7 +1037,10 @@
     top10: function (range, type) { return ADAPTERS[getProvider()].top(range || 'today', mediaType(type)); },
     byGenre: function (genre, page, sort, type) { return ADAPTERS[getProvider()].genre(genre, page || 1, sort || 'popularity', mediaType(type)); },
     byFormat: function (format, page) { return ADAPTERS[getProvider()].format(format, page || 1); },
-    recommendations: function (id, type) { return ADAPTERS[getProvider()].reco(id, mediaType(type)); },
+    recommendations: function (id, type, provider) {
+      var p = provider && PROVIDERS[provider] ? provider : getProvider();
+      return ADAPTERS[p].reco(id, mediaType(type));
+    },
     detail: function (provider, id, type) {
       var p = PROVIDERS[provider] ? provider : getProvider();
       var t = mediaType(type);

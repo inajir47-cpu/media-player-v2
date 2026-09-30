@@ -1097,6 +1097,7 @@
       tintFromPoster(mount, d.image);
       mountDetailVideo(mount, d, mediaType);
       mountEpList(mount, provider, id, d, (d.mediaType || mediaType) === 'MANGA');
+      mountRecommendations(mount, provider, id, d, (d.mediaType || mediaType));
       whenStreamReady(function (S) { S.wireDetail(mount, provider, id, d, mediaType); });
       var woBtn = mount.querySelector('[data-watch-order]');
       if (woBtn) woBtn.addEventListener('click', function () { openWatchOrder(provider, d); });
@@ -1172,7 +1173,7 @@
       ? '<section class="online-block"><h2>Cast &amp; Characters</h2><div class="cast-grid">' +
         d.characters.map(function (c) { return castCard(c, d.provider); }).join('') + '</div></section>' : '';
     var rel = (d.relations || []).length
-      ? '<section class="online-block"><h2>Related</h2><div class="poster-grid online-grid">' +
+      ? '<section class="online-block"><h2>Related</h2><div class="rel-strip">' +
         d.relations.map(function (r) {
           var rManga = r.format === 'MANGA';
           return '<a class="poster-card" href="#/' + SEC_ID + '/online/' + d.provider + '/' +
@@ -1182,6 +1183,7 @@
             esc(r.title) + '</span><span class="poster-meta">' + esc(r.kind || '') + '</span></a>';
         }).join('') + '</div></section>' : '';
     var studios = (d.studios || []).length ? '<p class="detail-studios">' + esc(d.studios.join(' · ')) + '</p>' : '';
+    var recoPh = '<section class="online-block" data-reco-block hidden><h2>Recommended</h2><div class="rel-strip" data-reco-grid></div></section>';
     return '<div class="online-detail" data-tone-root>' +
       (d.banner ? '<div class="detail-banner"><img src="' + esc(d.banner) + '" alt="" loading="lazy"></div>' : '') +
       '<div class="online-wrap"><a class="back-link" href="' + backHref + '">' +
@@ -1200,7 +1202,32 @@
         '<section class="online-block"><h2>Synopsis</h2><p class="synopsis">' +
           esc(d.synopsis || 'No synopsis available.') + '</p></section>' +
         epListPlaceholder(d, isManga) +
-        seasons + cast + rel + '</div></div>';
+        seasons + cast + rel + recoPh + '</div></div>';
+  }
+
+  // "Recommended" row: fetched lazily after the detail renders (AniList
+  // recommendation nodes / Jikan recommendations; Kitsu returns none, so
+  // the section stays hidden there). Cards link to the title detail page,
+  // so tapping one opens its full detail view.
+  function mountRecommendations(mount, provider, id, d, mediaType) {
+    var block = mount.querySelector('[data-reco-block]');
+    if (!block) return;
+    var isManga = (d.mediaType || mediaType) === 'MANGA';
+    API().recommendations(id, isManga ? 'MANGA' : 'ANIME', provider).then(function (items) {
+      items = (items || []).filter(function (r) {
+        return r && r.id && String(r.id) !== String(d.id);
+      }).slice(0, 12);
+      if (!items.length || !block.isConnected) return;
+      block.querySelector('[data-reco-grid]').innerHTML = items.map(function (r) {
+        var rManga = r.mediaType === 'MANGA';
+        var href = '#/' + SEC_ID + '/online/' + (r.provider || provider) + '/' +
+          (rManga ? 'manga/' : '') + encodeURIComponent(r.id);
+        return '<a class="poster-card" href="' + href + '"><span class="poster-img"><img src="' +
+          esc(r.image) + '" alt="' + esc(r.title) + '" loading="lazy">' + posterScore(r) +
+          '</span><span class="poster-title">' + esc(r.title) + '</span></a>';
+      }).join('');
+      block.hidden = false;
+    }).catch(function () { /* no recommendations: section stays hidden */ });
   }
 
   // Placeholder for the episode (anime) / chapter (manga) list; filled in

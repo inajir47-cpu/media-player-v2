@@ -459,6 +459,30 @@ button.trailer-btn { cursor: pointer; font-family: inherit; }
 @media (max-width: 560px) {
   .ep-strip .episode-card { flex-basis: 200px; width: 200px; }
 }
+/* Horizontal Related / Recommended strips: single-line momentum scroll,
+   slim theme scrollbar, fixed card widths. */
+.rel-strip {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 2px 10px;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  scrollbar-color: var(--faint) transparent;
+}
+.rel-strip::-webkit-scrollbar { height: 5px; }
+.rel-strip::-webkit-scrollbar-thumb { background: var(--faint); border-radius: 999px; }
+.rel-strip::-webkit-scrollbar-track { background: transparent; }
+.rel-strip .poster-card {
+  flex: 0 0 132px;
+  width: 132px;
+  scroll-snap-align: start;
+}
+@media (max-width: 560px) {
+  .rel-strip .poster-card { flex-basis: 112px; width: 112px; }
+}
 /* Jump-to-episode/chapter box, next to the Episodes/Chapters heading. */
 .ep-head-row {
   display: flex;
