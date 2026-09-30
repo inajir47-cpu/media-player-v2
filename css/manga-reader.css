@@ -1,0 +1,117 @@
+/* Media Player V2 — Manga reader (MangaDex vertical-scroll reader).
+   Pitch-black OLED theme, matches the stream player chrome. */
+.md-reader {
+  position: fixed; inset: 0; z-index: 970;
+  background: #000; color: #fff;
+  display: flex; flex-direction: column;
+  font-family: Manrope, system-ui, sans-serif;
+}
+.md-rd-head {
+  flex: 0 0 58px; display: flex; align-items: center; gap: 10px;
+  padding: 0 12px;
+  background: rgba(8, 8, 10, .94);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(255, 255, 255, .07);
+}
+.md-rd-back {
+  flex: 0 0 auto; width: 38px; height: 38px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, .06);
+  border: 1px solid rgba(255, 255, 255, .09);
+  color: #fff; cursor: pointer;
+}
+.md-rd-back svg { width: 20px; height: 20px; }
+.md-rd-back:active { background: rgba(255, 255, 255, .12); }
+.md-rd-meta { flex: 1 1 auto; min-width: 0; }
+.md-rd-title {
+  font-weight: 800; font-size: 15px; line-height: 1.25;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.md-rd-ch {
+  font-size: 12px; color: rgba(255, 255, 255, .55);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px;
+}
+/* EN/JA segmented toggle — same pill language as the SUB/DUB dropdowns */
+.md-rd-lang {
+  flex: 0 0 auto; display: flex; gap: 2px; padding: 3px;
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .09);
+  border-radius: 999px;
+}
+.md-rd-lang button {
+  border: 0; background: transparent; cursor: pointer;
+  color: rgba(255, 255, 255, .55);
+  font: 700 12px/1 Manrope, system-ui, sans-serif;
+  padding: 8px 14px; border-radius: 999px;
+}
+.md-rd-lang button.on { background: #7c3aed; color: #fff; }
+.md-rd-pages {
+  position: relative; flex: 1 1 auto;
+  overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior: contain;
+  background: #000;
+  -webkit-overflow-scrolling: touch;
+}
+.md-rd-page {
+  display: block; width: 100%; max-width: 880px; height: auto;
+  margin: 0 auto;
+  user-select: none; -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.md-rd-page + .md-rd-page { border-top: 1px solid rgba(255, 255, 255, .04); }
+.md-rd-foot {
+  flex: 0 0 62px; display: flex; align-items: center; gap: 10px;
+  padding: 0 12px;
+  background: rgba(8, 8, 10, .94);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  border-top: 1px solid rgba(255, 255, 255, .07);
+}
+.md-rd-prev, .md-rd-next {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 6px;
+  background: rgba(255, 255, 255, .06);
+  border: 1px solid rgba(255, 255, 255, .09);
+  color: #fff; border-radius: 999px;
+  font: 700 13px Manrope, system-ui, sans-serif;
+  padding: 9px 15px; cursor: pointer;
+}
+.md-rd-prev svg, .md-rd-next svg { width: 16px; height: 16px; }
+.md-rd-prev:active, .md-rd-next:active { background: rgba(255, 255, 255, .12); }
+.md-rd-mid { flex: 1 1 auto; min-width: 0; }
+.md-rd-count {
+  text-align: center; font-size: 12px; font-weight: 600;
+  color: rgba(255, 255, 255, .6); margin-bottom: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.md-rd-bar {
+  height: 3px; background: rgba(255, 255, 255, .12);
+  border-radius: 2px; overflow: hidden;
+}
+.md-rd-bar i {
+  display: block; height: 100%; width: 0;
+  background: #7c3aed; border-radius: 2px;
+  transition: width .15s ease;
+}
+.md-rd-loading, .md-rd-error {
+  min-height: 55vh; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 14px;
+  color: rgba(255, 255, 255, .6); font-size: 14px;
+  padding: 40px 20px; text-align: center;
+}
+.md-rd-error svg { width: 44px; height: 44px; opacity: .4; }
+.md-rd-spin {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, .14);
+  border-top-color: #7c3aed;
+  animation: md-rd-spin .9s linear infinite;
+}
+@keyframes md-rd-spin { to { transform: rotate(360deg); } }
+.md-rd-retry {
+  background: #7c3aed; color: #fff; border: 0; border-radius: 999px;
+  font: 700 14px Manrope, system-ui, sans-serif;
+  padding: 10px 26px; cursor: pointer;
+}
+@media (max-width: 560px) {
+  .md-rd-prev span, .md-rd-next span { display: none; }
+  .md-rd-prev, .md-rd-next { padding: 9px 12px; }
+  .md-rd-title { font-size: 14px; }
+}

@@ -1034,6 +1034,7 @@
     GENRES: GENRES,
     getProvider: getProvider,
     setProvider: setProvider,
+    mdMangaUuid: mdMangaUuid, /* chunk 1 (manga reader): AniList/MAL title -> MangaDex UUID bridge */
     top10: function (range, type) { return ADAPTERS[getProvider()].top(range || 'today', mediaType(type)); },
     byGenre: function (genre, page, sort, type) { return ADAPTERS[getProvider()].genre(genre, page || 1, sort || 'popularity', mediaType(type)); },
     byFormat: function (format, page) { return ADAPTERS[getProvider()].format(format, page || 1); },
