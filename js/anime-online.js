@@ -1241,6 +1241,49 @@
       '<p class="dim">Animation &rarr; Settings &rarr; Content &rarr; Show adult (18+) titles.</p></div>';
   }
 
+  // 18+ safety warning modal: shown every time an adult title is opened,
+  // even with the Settings opt-in on (the opt-in only lifts the block).
+  // Proceed renders the detail; Cancel / scrim / Escape go back.
+  function closeAdultWarn() {
+    var old = document.getElementById('adultWarnScrim');
+    if (old) { old.remove(); if (window.MPV2.unlockBodyScroll) window.MPV2.unlockBodyScroll(); }
+  }
+  function adultWarnModal(d, onProceed) {
+    closeAdultWarn(); // never stack two warnings
+    var scrim = document.createElement('div');
+    scrim.className = 'st-scrim';
+    scrim.id = 'adultWarnScrim';
+    scrim.innerHTML =
+      '<div class="st-dialog adult-warn" role="dialog" aria-modal="true" aria-label="Adult content warning">' +
+        '<span class="adult18 big">18+</span>' +
+        '<h3>Adult content</h3>' +
+        '<p class="st-sub">This title contains adult content. Please be careful. ' +
+        'If you are a minor, do not proceed.</p>' +
+        '<div class="adult-warn-actions">' +
+          '<button type="button" class="adult-warn-cancel" data-aw-cancel>Cancel</button>' +
+          '<button type="button" class="st-start" data-aw-go>Proceed &middot; View Anyway</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(scrim);
+    if (window.MPV2.lockBodyScroll) window.MPV2.lockBodyScroll();
+    function done() {
+      scrim.remove();
+      if (window.MPV2.unlockBodyScroll) window.MPV2.unlockBodyScroll();
+      document.removeEventListener('keydown', onKey);
+    }
+    function onKey(e) { if (e.key === 'Escape') cancel(); }
+    function cancel() {
+      done();
+      if (window.history.length > 1) window.history.back();
+      else window.location.hash = '#/' + SEC_ID + (d.mediaType === 'MANGA' ? '/manga' : '/discover');
+    }
+    function go() { done(); onProceed(); }
+    document.addEventListener('keydown', onKey);
+    scrim.addEventListener('click', function (e) { if (e.target === scrim) cancel(); });
+    scrim.querySelector('[data-aw-cancel]').addEventListener('click', cancel);
+    scrim.querySelector('[data-aw-go]').addEventListener('click', go);
+  }
+
   // Faded, muted, looping opening video on the right side of the detail hero
   // card — the same placement as the Konosuba player's trailer layer.
   function mountDetailVideo(mount, d, mediaType) {
@@ -1389,15 +1432,11 @@
     mount.innerHTML = pageHead(sec, 'Loading', 'Fetching title details…') +
       '<div class="online-wrap">' + skeletonCards(3) + '</div>';
     window.scrollTo(0, 0);
-    API().detail(provider, id, mediaType).then(function (d) {
+    // Full detail render, shared by the normal path and the 18+ Proceed path.
+    // recordView and the tab title only fire here, so a cancelled 18+ open
+    // leaves no trace in Recently Viewed.
+    function renderDetailBody(d) {
       document.title = d.title + ' · ' + sec.name + ' · Media Player V2';
-      // 18+ gate (AniList-style): metadata sits behind the Settings opt-in.
-      if (d.isAdult && !adultAllowed()) {
-        mount.innerHTML = pageHead(sec, 'Details', 'Adult title.') +
-          '<div class="online-wrap">' + adultGateHtml(d) + '</div>';
-        window.scrollTo(0, 0);
-        return;
-      }
       mount.innerHTML = detailHtml(sec, d, mediaType);
       lastDetail = d; lastDetailProvider = provider;
       recordView(d, provider, id, mediaType);
@@ -1418,6 +1457,19 @@
       mountSmartReadButton(mount, d);
       ensureCountdownTicker();
       window.scrollTo(0, 0);
+    }
+    API().detail(provider, id, mediaType).then(function (d) {
+      // 18+ gate (AniList-style): metadata sits behind the Settings opt-in.
+      if (d.isAdult && !adultAllowed()) {
+        mount.innerHTML = pageHead(sec, 'Details', 'Adult title.') +
+          '<div class="online-wrap">' + adultGateHtml(d) + '</div>';
+        window.scrollTo(0, 0);
+        return;
+      }
+      // 18+ safety warning: even opted-in, an adult title always asks first.
+      // Proceed renders the already-fetched detail; Cancel goes back.
+      if (d.isAdult) { adultWarnModal(d, function () { renderDetailBody(d); }); return; }
+      renderDetailBody(d);
     }).catch(function (err) {
       mount.innerHTML = pageHead(sec, 'Details', 'Something went wrong.') +
         '<div class="online-wrap">' + errorHtml(err) + '</div>';

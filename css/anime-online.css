@@ -875,3 +875,13 @@ button.trailer-btn { cursor: pointer; font-family: inherit; }
 /* Note used when a list section is intentionally not offered. */
 .muted-note { color: rgba(255,255,255,.55); padding: 4px 2px 18px; }
 :root[data-theme="light"] .muted-note { color: rgba(23,23,21,.55); }
+
+/* 18+ safety warning modal. */
+.adult-warn { text-align: center; }
+.adult-warn h3 { margin: 14px 0 8px; font-size: 20px; font-weight: 800; color: #fff; }
+.adult-warn .st-sub { margin: 0 0 20px; }
+.adult-warn-actions { display: flex; gap: 10px; }
+.adult-warn-actions .st-start { flex: 1; }
+.adult-warn-cancel { flex: 1; padding: 13px; border-radius: 14px; font: inherit;
+  font-size: 15px; font-weight: 800; color: #fff; cursor: pointer;
+  background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14); }

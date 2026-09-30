@@ -359,13 +359,15 @@
   }
 
   /* Watch-history cards (shared by the home carousel and the History page). */
-  function historyCardHtml(sec, e) {
+  function historyCardHtml(sec, e, removable) {
     var W = window.MPV2.Watch;
     var pct = W.progressPct(e);
     var done = W.isDone(e);
     var badge = e.kind === 'movie' ? 'MOVIE' : ('S' + (e.season || 1) + ' E' + e.episode);
     var meta = (e.lang ? e.lang + ' · ' : '') + (done ? 'Completed' : (e.position > 3 ? W.fmtLeft(e) : 'Just started'));
     return '<article class="rw-card">' +
+      (removable ? '<button type="button" class="rw-remove" data-rw-remove="' + esc(e.key) +
+        '" aria-label="Remove ' + esc(e.title || 'this title') + ' from history">' + icon('x') + '</button>' : '') +
       '<a class="rw-main" href="' + esc(e.href || '#/' + sec.id + '/home') + '">' +
         '<span class="rw-poster">' +
           (e.poster ? '<img src="' + esc(e.poster) + '" alt="" loading="lazy">' : '<span class="rw-noposter">' + icon('play') + '</span>') +
@@ -398,7 +400,7 @@
     if (!items.length) {
       return head + emptyState('history', 'Nothing watched yet', 'Completed and in-progress titles will appear here.');
     }
-    var cards = items.map(function (e) { return historyCardHtml(sec, e); }).join('');
+    var cards = items.map(function (e) { return historyCardHtml(sec, e, true); }).join('');
     return head +
       '<div class="row-head"><span class="muted-link">Latest first</span>' +
       '<button type="button" class="link-btn" id="clearHistory">Clear history</button></div>' +
@@ -1737,6 +1739,17 @@
         W.getHistory().slice().forEach(function (e) { W.removeEntry(e.key); });
         render();
         toast('Watch history cleared');
+      });
+      // Per-item remove: instant, no confirmation, live-refreshes via render().
+      root.querySelectorAll('[data-rw-remove]').forEach(function (btn) {
+        btn.addEventListener('click', function (ev) {
+          ev.preventDefault(); ev.stopPropagation();
+          var W = window.MPV2.Watch;
+          if (!W) return;
+          W.removeEntry(btn.getAttribute('data-rw-remove'));
+          render();
+          toast('Removed from history');
+        });
       });
     }
     // ONLINE PHASE: Discover block on the Animation home page.
