@@ -200,12 +200,12 @@
 .genre-tag { font-size: 11.5px; font-weight: 600; padding: 5px 11px; border-radius: 999px;
   background: color-mix(in srgb, var(--tone) 16%, transparent);
   border: 1px solid color-mix(in srgb, var(--tone) 40%, transparent); }
-.trailer-btn { display: inline-flex; align-items: center; gap: 8px;
-  background: var(--tone); color: #fff; text-decoration: none; font-weight: 700; font-size: 14px;
-  padding: 10px 22px; border-radius: 999px;
-  box-shadow: 0 6px 22px color-mix(in srgb, var(--tone) 50%, transparent); }
-.trailer-btn .icon { width: 18px; height: 18px; }
-button.trailer-btn { border: 0; cursor: pointer; font-family: inherit; }
+.trailer-btn { display: inline-flex; align-items: center; gap: 10px;
+  background: transparent; color: var(--ink, #fff); text-decoration: none;
+  font-weight: 600; font-size: 15px; padding: 10px 4px; border: 0; }
+.trailer-btn .icon { width: 20px; height: 20px; }
+.trailer-btn:active { opacity: .7; }
+button.trailer-btn { cursor: pointer; font-family: inherit; }
 /* Action buttons (Trailer / Watch Order) sit in their own row with clean
    separation from the poster — never crowding it on narrow screens. */
 .detail-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
@@ -218,12 +218,11 @@ button.trailer-btn { border: 0; cursor: pointer; font-family: inherit; }
   box-shadow: 0 6px 22px color-mix(in srgb, var(--tone) 50%, transparent); }
 .wh-play .icon { width: 18px; height: 18px; }
 .wh-play:active { transform: scale(.97); }
-.wh-save { display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
-  font-family: inherit; font-weight: 700; font-size: 14px; color: var(--ink, #fff);
-  background: color-mix(in srgb, var(--tone) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--tone) 45%, transparent);
-  padding: 12px 20px; border-radius: 999px; }
-.wh-save .icon { width: 17px; height: 17px; }
+.wh-save { display: inline-flex; align-items: center; gap: 10px; cursor: pointer;
+  font-family: inherit; font-weight: 600; font-size: 15px; color: var(--ink, #fff);
+  background: transparent; border: 0; padding: 10px 4px; }
+.wh-save .icon { width: 20px; height: 20px; }
+.wh-save:active { opacity: .7; }
 .wh-save.saved { background: color-mix(in srgb, var(--tone) 30%, transparent); }
 .wh-save.saved .icon { fill: var(--tone); }
 
@@ -574,7 +573,9 @@ button.trailer-btn { border: 0; cursor: pointer; font-family: inherit; }
   padding: 2px 12px; cursor: pointer;
 }
 .rating-btn:active { transform: scale(.96); }
-.rating-static { color: #ffd76a; }
+.rating-static { display: inline-block; color: #ffd76a; background: rgba(255,215,106,.1);
+  border: 1px solid rgba(255,215,106,.35); border-radius: 999px;
+  padding: 2px 12px; font-size: .92em; }
 .rv-dialog { text-align: left; }
 .rv-body { display: flex; flex-direction: column; gap: 14px; }
 .rv-score-head { display: flex; align-items: baseline; gap: 10px; }

@@ -1081,7 +1081,7 @@
     }
     var trailer = d.trailerYoutube
       ? '<a class="trailer-btn" href="https://www.youtube.com/watch?v=' + esc(d.trailerYoutube) +
-        '" target="_blank" rel="noopener">' + icon('play') + '<span>Trailer</span></a>' : '';
+        '" target="_blank" rel="noopener">' + icon('film') + '<span>Trailer</span></a>' : '';
     var watchOrder = (!isManga && ((d.relations && d.relations.length) || d.nextAiring))
       ? '<button class="trailer-btn wo-btn" data-watch-order>' + icon('list') +
         '<span>Watch Order</span></button>' : '';
@@ -1123,9 +1123,8 @@
         '<header class="detail-hero"><span class="poster-img big"><img src="' + esc(d.image) +
           '" alt="' + esc(d.title) + ' poster"></span>' +
         '<div class="detail-copy"><p class="detail-kicker">' + esc(providerName()) + '</p>' +
-          '<h1>' + esc(d.title) + '</h1><p class="detail-meta">' + esc(meta) + '</p>' +
-          (ratingBtn ? '<p class="detail-meta">' + ratingBtn + '</p>' : '') +
-          (d.startText ? '<p class="detail-meta dim">' + esc(d.startText) + '</p>' : '') +
+          '<h1>' + esc(d.title) + '</h1><p class="detail-meta">' + esc(meta) +
+            (ratingBtn ? ' · ' + ratingBtn : '') + '</p>' +
           studios +
           '<div class="genre-tags">' + (d.genres || []).map(function (g) {
             return '<span class="genre-tag">' + esc(g) + '</span>';
