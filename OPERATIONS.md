@@ -512,6 +512,29 @@ Obey this on every update. Updated 2026-09-30.
     `#/animation/online/anilist/manga/444`, clicking the novel card rendered
     the novel detail with no error. NOT phone-tested — only Imran's device
     counts.
+30. 2026-09-30 — Franchise/Seasons aggregation: FIXED (AniList). The Seasons
+    strip showed only directly-linked SEQUEL/PREQUEL titles (e.g. KonoSuba S1
+    + S2), missing S3, the movie, OVAs and spin-offs. Two compounding causes:
+    (a) the filter dropped SIDE_STORY/SPIN_OFF/PARENT edges; (b) AniList
+    relations are per-title, not per-franchise — S3 and the movie hang off S2
+    (S1 -> S2 -> movie -> S3), so no filter widening alone could reveal them.
+    Fix in `js/anime-api.js`: new franchise helpers — `alFranchise()` walks
+    the sequel/prequel chain transitively (light relations-only query per hop
+    via `alFranchiseRels()`, 48h-persistent in api48 like detail, capped at 15
+    titles, manga-type formats excluded), collects directly-connected side
+    stories/spin-offs/parent stories, and orders chain-first (prequels ...,
+    this title, ... sequels) then sides by year. `frKind()` labels cards by
+    format (Movie/OVA/Special) or relation (Sequel/Prequel/Side story/
+    Spin-off). Every hop is failure-isolated — a dead hop ends that walk, a
+    total failure falls back to the direct edges — so the detail can never
+    error-screen because of this. Adaptations stay in Related; the render
+    needed no change. Verified in real Chromium against the shipped page with
+    fetch interception (KonoSuba-like 4-hop chain + OVA side story + novel):
+    strip showed S1 (This season), S2 (Sequel), Movie (Movie), S3 (Sequel),
+    OVA (Side story) in order, novel correctly absent, no error. Screenshot:
+    franchise-strip.png. Jikan left as-is (its relations are already
+    unfiltered anime-only; no multi-hop to respect its strict rate limits).
+    NOT phone-tested — only Imran's device counts.
 
 ## Standing rules — obey on every update
 

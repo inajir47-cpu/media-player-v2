@@ -174,6 +174,90 @@
     });
   }
 
+  /* ============ Franchise aggregation (AniList "Seasons" strip) ============
+   * AniList has no franchise endpoint. The strip is built by walking the
+   * sequel/prequel chain transitively — S1 -> S2 -> movie -> S3 are NOT all
+   * direct edges of S1 — plus directly-connected side stories, spin-offs and
+   * parent stories. Adaptations stay in the Related section.
+   * Each hop is a light relations-only query, cached 48h via cached(); a
+   * failed hop just ends that walk, so the detail can never break on it. */
+  var FR_SIDE_KIND = { SIDE_STORY: 'Side story', SPIN_OFF: 'Spin-off', PARENT: 'Parent story' };
+  var FR_MANGA_FORMAT = { MANGA: 1, NOVEL: 1, ONE_SHOT: 1 };
+  function frKind(relationType, format) {
+    var f = String(format || '').toUpperCase();
+    if (f === 'MOVIE') return 'Movie';
+    if (f === 'OVA') return 'OVA';
+    if (f === 'SPECIAL') return 'Special';
+    if (f === 'ONA') return 'ONA';
+    if (f === 'TV_SHORT') return 'Short';
+    if (f === 'MUSIC') return 'Music video';
+    if (relationType === 'SEQUEL') return 'Sequel';
+    if (relationType === 'PREQUEL') return 'Prequel';
+    return FR_SIDE_KIND[relationType] || 'Related';
+  }
+  function frCard(node, relationType, kindOverride) {
+    var sd = node.startDate || {};
+    return { id: node.id, title: pickTitle(node.title),
+             image: (node.coverImage && node.coverImage.large) || '',
+             episodes: node.episodes || null, chapters: node.chapters || null,
+             year: sd.year || null, format: node.format || null,
+             kind: kindOverride || frKind(relationType, node.format) };
+  }
+  function alFranchiseRels(id, t) {
+    // 48h-persistent like detail (api48), so repeat franchise views are free.
+    var key = 'r:v2:anilist:' + t + ':' + id;
+    var hit = api48Get(key);
+    if (hit) return Promise.resolve(hit);
+    return alQuery(
+      'query($id:Int){Media(id:$id){relations{edges{relationType ' +
+      'node{id type title{romaji english} coverImage{large} episodes format startDate{year}}}}}}',
+      { id: parseInt(id, 10) }
+    ).then(function (d) {
+      var edges = (d && d.Media && d.Media.relations && d.Media.relations.edges) || [];
+      var out = edges.filter(function (e) {
+        return e && e.node && e.node.id && e.node.type === t &&
+          (t === 'MANGA' || !FR_MANGA_FORMAT[e.node.format]);
+      });
+      api48Set(key, out);
+      return out;
+    });
+  }
+  function alFranchise(id, directRels, t, selfCard, fallback) {
+    var seen = {};
+    seen[id] = true;
+    function count() { var n = 0; for (var k in seen) n++; return n; }
+    // Directly-connected side entries (OVAs, specials, spin-offs...).
+    var sides = (directRels || []).filter(function (e) {
+      return e && e.node && e.node.id && FR_SIDE_KIND[e.relationType] &&
+        (t === 'MANGA' || !FR_MANGA_FORMAT[e.node.format]) && !seen[e.node.id];
+    }).map(function (e) { seen[e.node.id] = true; return frCard(e.node, e.relationType); });
+    // Transitive walk along one axis (sequels forward / prequels back).
+    function walk(startId, dir, out) {
+      if (count() >= 15) return Promise.resolve();
+      return alFranchiseRels(startId, t).then(function (edges) {
+        var next = null;
+        for (var i = 0; i < edges.length; i++) {
+          if (edges[i].relationType === dir && !seen[edges[i].node.id]) { next = edges[i]; break; }
+        }
+        if (!next) return;
+        seen[next.node.id] = true;
+        out.push({ id: next.node.id, card: frCard(next.node, dir) });
+        return walk(next.node.id, dir, out);
+      }).catch(function () { /* a failed hop just ends this walk */ });
+    }
+    var fwd = [], bwd = [];
+    return walk(id, 'SEQUEL', fwd).then(function () { return walk(id, 'PREQUEL', bwd); })
+      .then(function () {
+        var list = [];
+        for (var i = bwd.length - 1; i >= 0; i--) list.push(bwd[i].card);
+        list.push(selfCard);
+        for (var j = 0; j < fwd.length; j++) list.push(fwd[j].card);
+        sides.sort(function (a, b) { return (a.year || 9999) - (b.year || 9999); });
+        return list.concat(sides);
+      })
+      .catch(function () { return fallback; });
+  }
+
   function anilistDetail(id, type) {
     var t = type === 'MANGA' ? 'MANGA' : 'ANIME';
     return cached('anilist:detail:' + t + ':' + id, function () {
@@ -211,19 +295,16 @@
                    createdAt: rv.createdAt || null };
         });
         var rels = (m.relations && m.relations.edges) || [];
-        // Seasons: walk the prequel/sequel chain around this title.
-        var seasons = rels
-          .filter(function (e) { return e.relationType === 'SEQUEL' || e.relationType === 'PREQUEL'; })
-          .map(function (e) {
-            return { id: e.node.id, title: pickTitle(e.node.title),
-                     image: (e.node.coverImage && e.node.coverImage.large) || '',
-                     episodes: e.node.episodes || null, chapters: e.node.chapters || null,
-                     year: (e.node.startDate && e.node.startDate.year) || null,
-                     kind: e.relationType === 'SEQUEL' ? 'Sequel' : 'Prequel' };
-          });
-        item.seasons = [{ id: m.id, title: item.title, image: item.image,
-                          episodes: item.episodes, year: item.year, kind: 'This season' }]
-          .concat(seasons);
+        // Franchise strip: direct edges as the instant fallback; the full
+        // chain (transitive sequel/prequel walk + side stories/spin-offs)
+        // resolves async at the end of this loader.
+        var selfCard = { id: m.id, title: item.title, image: item.image,
+                         episodes: item.episodes, year: item.year, kind: 'This season',
+                         format: m.format || null };
+        item.seasons = [selfCard].concat(rels
+          .filter(function (e) { return e && e.node &&
+            (e.relationType === 'SEQUEL' || e.relationType === 'PREQUEL'); })
+          .map(function (e) { return frCard(e.node, e.relationType); }));
         item.characters = ((m.characters && m.characters.edges) || [])
           .sort(function (x, y) { return roleWeight(x.role) - roleWeight(y.role); })
           .slice(0, 12).map(function (e) {
@@ -253,7 +334,12 @@
         item.streamEps = (m.streamingEpisodes || []).map(function (s) {
           return { title: s.title || '', thumb: s.thumbnail || '', url: s.url || '' };
         });
-        return item;
+        // Complete the franchise strip (transitive chain + side entries).
+        var fallbackSeasons = item.seasons;
+        return alFranchise(m.id, rels, t, selfCard, fallbackSeasons).then(function (seasons) {
+          item.seasons = seasons;
+          return item;
+        });
       });
     });
   }
