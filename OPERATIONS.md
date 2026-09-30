@@ -576,3 +576,14 @@ Obey this on every update. Updated 2026-09-30.
     phase 2 (repeat visit) instant `rgb(255,0,0)` with ZERO poster network
     requests. Screenshot: tint-proof.png. NOT phone-tested — only Imran's
     device counts.
+33. 2026-09-30 — Disabled horizontal swipe-to-switch-tabs (product decision).
+    `wireSwipeTabs()` in `js/app.js` (the only tab-switch gesture in the app:
+    touchstart/touchend on #view, >72px horizontal swipe -> route transition)
+    is now a documented no-op; the render() call site is untouched and the body
+    can be restored from git history. Hero carousel swipes (slide changes,
+    stopPropagation contained), video player gestures (seek/brightness/volume),
+    and poster/episode strip scrolling are fully preserved — verified in real
+    Chromium on #/animation/home with stubbed API data: 200px swipe on the tab
+    page left the hash unchanged, hero swipe advanced slide 0->1, and tab bar
+    tap navigated to #/animation/anime. NOT phone-tested — only Imran's device
+    counts.

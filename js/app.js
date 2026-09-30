@@ -2268,38 +2268,11 @@
     } else { motion.busy = false; }
   }
 
-  /* Swipe between tabs on touch devices (preview parity). */
-  function wireSwipeTabs(sec, tab) {
-    var view = document.getElementById('view');
-    var order = sec.tabs.map(function (t) { return t.id; });
-    var index = order.indexOf(tab);
-    var startX = 0, startY = 0, startTarget = null;
-    if (!view || index < 0) return;
-    view.addEventListener('touchstart', function (e) {
-      startTarget = e.target;
-      var touch = e.changedTouches[0];
-      startX = touch.clientX; startY = touch.clientY;
-    }, { passive: true });
-    view.addEventListener('touchend', function (e) {
-      if (!startTarget || startTarget.closest('[data-poster-rail],input,textarea,video,[role="dialog"]')) return;
-      // Never hijack a swipe that begins inside a horizontally scrollable
-      // strip (Top 10 carousel, episode strips, poster rails, chip rows):
-      // that gesture belongs to the strip, not to tab navigation.
-      for (var el = startTarget; el && el !== view; el = el.parentElement) {
-        if (el.scrollWidth > el.clientWidth + 8) {
-          var ox = '';
-          try { ox = getComputedStyle(el).overflowX; } catch (err) {}
-          if (ox === 'auto' || ox === 'scroll') return;
-        }
-      }
-      var touch = e.changedTouches[0];
-      var dx = touch.clientX - startX, dy = touch.clientY - startY;
-      if (Math.abs(dx) < 72 || Math.abs(dx) < Math.abs(dy) * 1.3) return;
-      var next = index + (dx < 0 ? 1 : -1);
-      if (next < 0 || next >= order.length) return;
-      startRouteTransition('#/' + sec.id + '/' + order[next], dx < 0 ? 1 : -1);
-    }, { passive: true });
-  }
+  /* Swipe between tabs: DISABLED by product decision (2026-09-30). Tabs switch
+     via the tab bar only — horizontal swipes belong to carousels, poster
+     rails, and episode strips. Kept as a no-op so the render() call site
+     stays valid; restore the body from git history to re-enable. */
+  function wireSwipeTabs(sec, tab) { return; }
 
   /* One global delegated handler drives every in-app navigation. */
   function wireMotionNavigation() {
