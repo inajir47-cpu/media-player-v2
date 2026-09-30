@@ -139,6 +139,24 @@ Obey this on every update. Updated 2026-09-30.
     the helpers exist. Verified: jsdom harness 41/41, real Chromium 22/22
     (screenshot `your_files/media-player-v2-backup/v2-godmode-results.png`).
 
+13. **2026-09-30 — nhentai adult-manga provider (Option 1).** New
+    `js/nhentai-provider.js`: keyless nhentai.net v2 API (search, gallery
+    detail, /config CDN pools), direct-first with worker `?d=` fallback.
+    God Mode (`anime-api.js`) also queries `nhSearch`, but ONLY when the 18+
+    Settings opt-in is on — otherwise nhentai is never touched (same rule as
+    adult AniList titles). Cards show red `nhentai` server tag + 18+ badge +
+    EN/JA badge; tap shows the 18+ safety warning modal every time, then opens
+    the gallery in the Manga Reader with pre-resolved page URLs (surgical
+    `manga-reader.js` change: `chapter.pages` bypasses MangaDex at-home
+    resolution; progress namespaced under `nhentai:<id>`). Verified: jsdom
+    35/35, real Chromium 10/10
+    (screenshots `v2-nhentai-results.png`, `v2-nhentai-warning.png`,
+    `v2-nhentai-reader.png`). Pack: `v2-nhentai-20260930.zip`. Local commit
+    `a0ab568`, NOT pushed/deployed. Lesson: nhentai blocks datacenter IPs —
+    sandbox/Render usually can't reach it; phone browser or the worker edge
+    near the user is the real test. **Option 2 (Heliotrope/Hitomi mirror) is
+    the planned backup provider — not built yet.**
+
 ## Standing rules — obey on every update
 
 - Build strictly part-by-part; surgical changes only; **diagnose the exact cause before rebuilding**.
