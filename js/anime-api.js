@@ -1090,7 +1090,7 @@
         'query ($id: Int) { Staff(id: $id) {' +
         ' id name{full native} image{large} description(asHtml:false)' +
         ' age dateOfBirth{year month day} gender bloodType primaryOccupations favourites' +
-        ' characters(perPage:10 sort:FAVOURITES_DESC){edges{voiceActorRole' +
+        ' characters(perPage:10 sort:FAVOURITES_DESC){edges{' +
         '  node{id name{full} image{large}}}}}}',
         { id: parseInt(id, 10) }
       ).then(function (d) {
@@ -1099,7 +1099,7 @@
         var roles = ((s.characters && s.characters.edges) || []).map(function (e) {
           var n = e.node || {};
           return { id: n.id || null, name: (n.name && n.name.full) || '?',
-                   image: (n.image && n.image.large) || '', role: e.voiceActorRole || '' };
+                   image: (n.image && n.image.large) || '' };
         });
         return save({ id: s.id || null, name: (s.name && s.name.full) || '?',
           native: (s.name && s.name.native) || '',
