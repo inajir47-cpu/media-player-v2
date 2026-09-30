@@ -128,6 +128,8 @@
         keys.slice(0, keys.length - CHPROG_CAP).forEach(function (k) { delete s[k]; });
       }
       localStorage.setItem(LS_CHPROG, JSON.stringify(s));
+      /* Mirror js/watch-history.js: let chapter lists refresh in place. */
+      try { document.dispatchEvent(new CustomEvent('mpv2:history')); } catch (e2) {}
     } catch (e) {}
   }
   function chKey(uuid, chapterId) { return 'mdx:' + uuid + ':ch:' + chapterId; }
@@ -143,6 +145,20 @@
   function getChProgress(uuid, chapterId) {
     if (!uuid || !chapterId) return null;
     return chStore()[chKey(uuid, chapterId)] || null;
+  }
+  /* Progress for every recorded chapter of one manga, keyed by chapter
+   * number (String) -> {p, pages, done}. Lets the chapter list paint
+   * progress bars / read states exactly like the episode tracker. */
+  function progressByChapter(uuid) {
+    var out = {}, s = chStore(), k, r, pfx = 'mdx:' + uuid + ':ch:';
+    if (!uuid) return out;
+    for (k in s) {
+      if (s.hasOwnProperty(k) && k.indexOf(pfx) === 0) {
+        r = s[k] || {};
+        if (r.ch !== null && r.ch !== undefined && r.ch !== '') out[String(r.ch)] = r;
+      }
+    }
+    return out;
   }
   /* Most recently touched chapter for a manga (continue-reading entry point). */
   function lastRead(uuid) {
@@ -396,6 +412,7 @@
     mangaUuid: mangaUuid,
     getChProgress: getChProgress,
     saveChProgress: saveChProgress,
+    progressByChapter: progressByChapter,
     lastRead: lastRead
   };
 })();

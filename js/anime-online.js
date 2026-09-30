@@ -1504,13 +1504,16 @@
     try { localStorage.setItem(EP_WATCHED_KEY, JSON.stringify(w)); } catch (e) {}
   }
 
-  function epCardHtml(provider, id, it, isCh, cover, hkey) {
+  function epCardHtml(provider, id, it, isCh, cover, hkey, chProgMap) {
     var key = provider + ':' + id + ':' + (isCh ? 'ch' : 'ep') + ':' + it.n;
     var manualWatched = !!epWatched()[key];
-    // Per-episode watch progress: auto-complete when watched to the end,
-    // progress bar when partially watched.
+    // Per-episode/chapter progress: auto-complete when watched to the end,
+    // progress bar when partially watched. Chapters read mpv2_ch_progress_v1
+    // through the number-keyed map (see progressByChapter).
     var prog = null;
-    if (!isCh && hkey) {
+    if (isCh) {
+      if (chProgMap) prog = chProgMap[String(it.n)] || null;
+    } else if (hkey) {
       try {
         var W = window.MPV2 && window.MPV2.Watch;
         var pm = W ? W.getEpProgress(hkey) : null;
@@ -1519,8 +1522,12 @@
     }
     var done = manualWatched || !!(prog && prog.done);
     var pct = 0;
-    if (!done && prog && prog.d > 0 && prog.p > 5) {
-      pct = Math.max(2, Math.min(100, Math.round((prog.p / prog.d) * 100)));
+    // Chapters: p is the 0-based page index, pages the page count.
+    var pCur = prog ? (isCh ? prog.p + 1 : prog.p) : 0;
+    var pTot = prog ? (isCh ? prog.pages : prog.d) : 0;
+    var pMin = isCh ? 1 : 5;
+    if (!done && prog && pTot > 0 && pCur > pMin) {
+      pct = Math.max(2, Math.min(isCh ? 99 : 100, Math.round((pCur / pTot) * 100)));
     }
     var num = isCh ? 'Ch ' + it.n : String(it.n).padStart(2, '0');
     var soon = it.ts && it.ts > Date.now();
@@ -1569,6 +1576,25 @@
       var haid = (hprov === 'anilist' && d.id) ? String(d.id) : null;
       hkey = haid ? 'anilist:' + haid
                   : 't:' + String(d.title || '').toLowerCase().trim();
+    }
+    // Manga: chapter progress is keyed by MangaDex uuid — resolve it once per
+    // detail page, then paint bars / read states (covers cards rendered before
+    // the resolve finished, plus late resume-centering below).
+    var chUuid = null, chProgMap = {}, didCenterCh = false;
+    function chProgReady() { return chUuid !== null; }
+    if (isCh && d && window.MPV2 && window.MPV2.AnimeAPI &&
+        typeof window.MPV2.AnimeAPI.mdMangaUuid === 'function') {
+      try {
+        window.MPV2.AnimeAPI.mdMangaUuid(d.malId || null, d.title || '').then(function (uuid) {
+          chUuid = uuid || '';
+          refreshChStates();
+          if (!didCenterCh) {
+            didCenterCh = true;
+            var cc = currentCh();
+            if (cc && cc > 1 && (!total || cc <= total)) jumpTo(cc, true);
+          }
+        });
+      } catch (e) {}
     }
     block.addEventListener('click', function (e) {
       var b = e.target.closest('[data-ep-watched]');
@@ -1626,12 +1652,46 @@
         }
       });
     }
+    function refreshChStates() {
+      if (!isCh || !chProgReady()) return;
+      try {
+        if (window.MPV2 && window.MPV2.MangaReader &&
+            typeof window.MPV2.MangaReader.progressByChapter === 'function') {
+          chProgMap = window.MPV2.MangaReader.progressByChapter(chUuid) || {};
+        }
+      } catch (e) {}
+      var w = epWatched();
+      strip.querySelectorAll('.episode-card[data-ch-n]').forEach(function (card) {
+        var n = card.getAttribute('data-ch-n');
+        var btn = card.querySelector('[data-ep-watched]');
+        var key = btn ? btn.getAttribute('data-ep-watched') : null;
+        var prog = chProgMap[n] || null;
+        var done = (key && !!w[key]) || !!(prog && prog.done);
+        card.classList.toggle('watched', done);
+        var pCur = prog ? prog.p + 1 : 0, pTot = prog ? prog.pages : 0;
+        var pct = (!done && prog && pTot > 0 && pCur > 1)
+          ? Math.max(2, Math.min(99, Math.round((pCur / pTot) * 100))) : 0;
+        var bar = card.querySelector('.ep-progress');
+        if (pct > 0) {
+          if (!bar) {
+            bar = document.createElement('span');
+            bar.className = 'ep-progress';
+            bar.innerHTML = '<span></span>';
+            card.appendChild(bar);
+          }
+          bar.firstChild.style.width = pct + '%';
+        } else if (bar) {
+          bar.remove();
+        }
+      });
+    }
     function onHistory() {
       if (!document.contains(block)) {
         document.removeEventListener('mpv2:history', onHistory);
         return;
       }
       refreshEpStates();
+      refreshChStates();
     }
     document.addEventListener('mpv2:history', onHistory);
     // Movie block: single static row, already in the HTML — no pagination.
@@ -1643,9 +1703,23 @@
     var hasMore = false, loading = false, jumping = null, jumpingSilent = false;
     var didCenter = false;
     function setHead() {
-      head.textContent = (isCh ? 'Chapters' : 'Episodes') +
+      var label = (isCh ? 'Chapters' : 'Episodes') +
         (total ? ' · ' + total + ' listed' : '');
       if (jumpInput && total) jumpInput.max = total;
+      if (!isCh) { head.textContent = label; return; }
+      // Manga: prominent globe in the chapter section header — opens the
+      // provider/source dialog, the same dialog as the detail header Read button.
+      head.innerHTML = '<span class="ch-head-label">' + esc(label) + '</span>' +
+        '<button class="ch-src-btn" type="button" data-ch-src aria-label="Choose reading source">' +
+        icon('globe') + '</button>';
+      var srcBtn = head.querySelector('[data-ch-src]');
+      if (srcBtn) srcBtn.addEventListener('click', function () {
+        if (window.MPV2 && window.MPV2.MangaSource) {
+          window.MPV2.MangaSource.openSourceDialog({
+            title: d.title, malId: d.malId || null, image: d.image || ''
+          });
+        }
+      });
     }
     // Jump to episode/chapter number: auto-loads pages until the card
     // exists, then scrolls it into the center of the strip with a flash.
@@ -1697,6 +1771,27 @@
       } catch (e) {}
       return null;
     }
+    // The chapter to center when the list first opens: the partially-read
+    // one (resume point), else the next chapter after the last finished one.
+    function currentCh() {
+      if (!isCh || !chProgReady()) return null;
+      try {
+        if (window.MPV2 && window.MPV2.MangaReader &&
+            typeof window.MPV2.MangaReader.progressByChapter === 'function') {
+          chProgMap = window.MPV2.MangaReader.progressByChapter(chUuid) || {};
+        }
+        var resume = null, maxDone = 0;
+        Object.keys(chProgMap).forEach(function (k) {
+          var r = chProgMap[k], n = parseFloat(k);
+          if (!(n > 0) || !r) return;
+          if (r.done) { if (n > maxDone) maxDone = n; }
+          else if (r.p > 0 && (resume == null || n < resume)) resume = n;
+        });
+        if (resume != null) return resume;
+        if (maxDone > 0) return maxDone + 1;
+      } catch (e) {}
+      return null;
+    }
     function maybeLoadMore() {
       // Strip shorter than the viewport: keep paging until it scrolls
       // horizontally or the list is exhausted.
@@ -1719,7 +1814,7 @@
         if (!total && r.total) total = r.total;
         setHead();
         strip.insertAdjacentHTML('beforeend', r.items.map(function (it) {
-          return epCardHtml(provider, id, it, isCh, d.image, hkey);
+          return epCardHtml(provider, id, it, isCh, d.image, hkey, chProgMap);
         }).join(''));
         hasMore = !!r.hasMore;
         maybeLoadMore();
@@ -1728,8 +1823,11 @@
         // right under the thumb when the page is reopened.
         if (!didCenter) {
           didCenter = true;
-          var ce = currentEp();
-          if (ce && ce > 1 && (!total || ce <= total)) jumpTo(ce, true);
+          var ce = isCh ? currentCh() : currentEp();
+          if (ce && ce > 1 && (!total || ce <= total)) {
+            if (isCh) didCenterCh = true;
+            jumpTo(ce, true);
+          }
         }
       }).catch(function () { loading = false; if (page === 1) block.remove(); });
     }
