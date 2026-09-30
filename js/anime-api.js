@@ -1048,7 +1048,9 @@
     detail: function (provider, id, type) {
       var p = PROVIDERS[provider] ? provider : getProvider();
       var t = mediaType(type);
-      var key = 'd:' + p + ':' + t + ':' + id;
+      // v2: detail objects now carry `isAdult`. Entries cached before that
+      // have no such field and would slip past the 18+ gate — never reuse them.
+      var key = 'd:v2:' + p + ':' + t + ':' + id;
       var hit = api48Get(key);
       if (hit) return Promise.resolve(hit);
       return ADAPTERS[p].detail(id, t).then(function (d) { api48Set(key, d); return d; });

@@ -384,6 +384,7 @@
     var row = block.querySelector('#recoRow');
     API().recommendations(seed.id, state.type).then(function (items) {
       if (!row.isConnected) return;
+      items = hideAdult(items); // 18+ filter on "Recommended for you"
       if (!items.length) { sec.style.display = 'none'; return; }
       sec.querySelector('.online-sub').textContent =
         'More like ' + seed.title + ' · Source: ' + providerName();
@@ -441,7 +442,9 @@
       ok(api.byFormat('MOVIE', 1)),      // trending movies
       ok(api.top10('today', 'MANGA'))    // manga pool
     ]).then(function (r) {
-      var airing = r[0] || [], trend = r[1] || [], movies = r[2] || [], manga = r[3] || [];
+      // 18+ filter: hero slides never show adult titles unless opted in.
+      var airing = hideAdult(r[0]), trend = hideAdult(r[1]),
+          movies = hideAdult(r[2]), manga = hideAdult(r[3]);
       var slides = [];
       function push(item, kicker) { if (item && item.id) slides.push({ item: item, kicker: kicker }); }
       push(airing[0], 'ON AIR');
@@ -452,7 +455,7 @@
       var base = heroDedupe(slides);
       function withRecs(recs) {
         var rm = null, rs = null;
-        (recs || []).forEach(function (it) {
+        hideAdult(recs).forEach(function (it) {
           if (!rm && heroIsMovie(it)) rm = it;
           else if (!rs && heroIsSeries(it)) rs = it;
         });
@@ -745,6 +748,7 @@
     list.innerHTML = skeletonRows(5);
     API().top10(state.range, state.type).then(function (items) {
       if (!list.isConnected) return;
+      items = hideAdult(items); // 18+ filter on TOP 010
       list.innerHTML = items.length
         ? items.map(rankRow).join('')
         : emptyState('info', 'Nothing here yet', 'Try another range or provider.');
@@ -873,6 +877,7 @@
       if (!grid.isConnected) return;
       if (!append) state.items = [];
       state.items = state.items.concat(res.items);
+      state.items = hideAdult(state.items); // 18+ filter on Discover lists
       state.hasMore = res.hasMore;
       grid.innerHTML = state.items.length
         ? state.items.map(onlineCard).join('')
@@ -890,11 +895,7 @@
   // default Search tab (#/animation/search).
 
   function searchResultsHtml(q, res) {
-    var allowAdult = adultAllowed();
-    function visible(list) {
-      return (list || []).filter(function (it) { return allowAdult || !it.isAdult; });
-    }
-    var a = visible(res.anime), m = visible(res.manga);
+    var a = hideAdult(res.anime), m = hideAdult(res.manga);
     if (!a.length && !m.length)
       return emptyState('search', 'No results', 'Try a different title.');
     return '<div class="online-search-head"><h3>Results for &ldquo;' + esc(q) + '&rdquo;</h3></div>' +
@@ -1230,6 +1231,13 @@
   function adultAllowed() {
     try { return !!JSON.parse(localStorage.getItem('mpv2_settings_v1') || '{}').adult; }
     catch (e) { return false; }
+  }
+
+  // 18+ list filter: with the Settings opt-in OFF, adult titles are hidden
+  // from every list surface (search filters separately; this covers the rest).
+  function hideAdult(list) {
+    if (adultAllowed()) return list || [];
+    return (list || []).filter(function (it) { return !it || !it.isAdult; });
   }
 
   // 18+ gate body: shown instead of the detail page when an adult title is
@@ -1590,7 +1598,7 @@
     var isManga = (d.mediaType || mediaType) === 'MANGA';
     API().recommendations(id, isManga ? 'MANGA' : 'ANIME', provider).then(function (items) {
       items = (items || []).filter(function (r) {
-        return r && r.id && String(r.id) !== String(d.id);
+        return r && r.id && String(r.id) !== String(d.id) && (adultAllowed() || !r.isAdult);
       }).slice(0, 12);
       if (!items.length || !block.isConnected) return;
       block.querySelector('[data-reco-grid]').innerHTML = items.map(function (r) {

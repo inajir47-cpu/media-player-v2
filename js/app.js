@@ -417,7 +417,7 @@
     if (!items.length) {
       return head + emptyState('history', 'Nothing watched yet', 'Episodes and movies you watch will appear here with your progress.') + '</section>';
     }
-    var cards = items.map(function (e) { return historyCardHtml(sec, e); }).join('');
+    var cards = items.map(function (e) { return historyCardHtml(sec, e, true); }).join('');
     return head + '<div class="rw-strip">' + cards + '</div></section>';
   }
   function homeHtml(sec) {
@@ -1730,8 +1730,9 @@
     }
     // Recently Watched continue buttons (home + history pages).
     if (tab === 'home' || tab === 'history') wireRecentWatched(root);
-    // History page: clear button.
-    if (tab === 'history') {
+    // History page: clear button. Per-item remove on the History tab and on
+    // the home Recently Watched row (both render removable cards).
+    if (tab === 'history' || tab === 'home') {
       var clearBtn = root.querySelector('#clearHistory');
       if (clearBtn) clearBtn.addEventListener('click', function () {
         var W = window.MPV2.Watch;
