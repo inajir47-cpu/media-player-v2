@@ -308,6 +308,57 @@ button.trailer-btn { cursor: pointer; font-family: inherit; }
   .cast-grid { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); }
 }
 
+/* Mobile-only Canva layout (≤768px): poster left + top text block right,
+   then studios / action bar / CTA full-width below. Desktop/tablet untouched. */
+@media (max-width: 768px) {
+  .detail-hero {
+    display: grid;
+    grid-template-columns: 112px minmax(0, 1fr);
+    gap: 0 14px;
+    align-items: start;
+  }
+  .detail-copy { display: contents; }
+
+  .detail-hero > .poster-img.big {
+    grid-column: 1;
+    grid-row: 1 / span 4;
+    width: 112px;
+    margin: 0;
+  }
+  .detail-copy > .detail-kicker {
+    grid-column: 2; grid-row: 1; margin: 0 0 4px;
+  }
+  .detail-copy > h1 {
+    grid-column: 2; grid-row: 2; margin: 0 0 6px;
+    font-size: 19px; line-height: 1.25;
+  }
+  .detail-copy > .detail-meta {
+    grid-column: 2; grid-row: 3; margin: 0 0 10px;
+  }
+  .detail-copy > .genre-tags {
+    grid-column: 2; grid-row: 4; margin: 0;
+  }
+  .detail-copy > .detail-studios {
+    grid-column: 1 / -1; grid-row: 5; margin: 12px 0 0;
+  }
+  .detail-copy > .detail-actions {
+    grid-column: 1 / -1; grid-row: 6;
+    margin: 14px 0 0;
+    display: flex; flex-wrap: nowrap; gap: 6px 12px;
+  }
+  .detail-copy > .detail-actions .trailer-btn,
+  .detail-copy > .detail-actions .wh-save {
+    font-size: 14px; padding: 10px 2px; gap: 8px; white-space: nowrap;
+  }
+  .detail-copy > .wh-row {
+    grid-column: 1 / -1; grid-row: 7;
+    margin: 14px 0 0; display: flex;
+  }
+  .detail-copy > .wh-row .wh-play {
+    flex: 1; justify-content: center;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sk::after { animation: none; }
   .top10-row, .pill, .chip { transition: none; }
