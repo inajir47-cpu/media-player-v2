@@ -104,12 +104,29 @@
   }
 
   window.haSearch = haSearch;
+  /* Tag browse for the details page: full-text search on the tag name
+     (the worker has no dedicated tag endpoint), paginated for the
+     horizontal infinite strip. */
+  function byTag(tag, page) {
+    var q = String(tag || '').trim();
+    if (!q) return Promise.resolve({ items: [], hasMore: false });
+    var p = Math.max(0, page | 0);
+    return haGetJson(HA + '/api/search?q=' + encodeURIComponent(q) + '&page=' + p)
+      .then(function (d) {
+        var items = ((d && d.results) || []).map(haItem);
+        var hasMore = d && typeof d.nbPages === 'number' ? (p + 1) < d.nbPages : items.length > 0;
+        return { items: items, hasMore: !!hasMore };
+      })
+      .catch(function () { return { items: [], hasMore: false }; });
+  }
+
   window.HanimeProvider = {
     id: 'hanime',
     label: 'hanime',
     search: haSearch,
     video: haVideo,
     genre: haGenre,
-    full: haFull
+    full: haFull,
+    byTag: byTag
   };
 })();

@@ -1931,6 +1931,75 @@
   // description, tags, Play button, and a "more from this brand" row.
   // Same 18+ rules as adult AniList titles: metadata sits behind the
   // Settings opt-in, and even opted-in the warning modal asks first.
+  /* Tag browser on the hanime details page: tapping a tag chip opens a
+     results strip between Tags and the brand row with horizontal infinite
+     scroll through that tag's videos. Tapping the same tag again closes
+     it; tapping another tag switches. */
+  function mountTagBrowser(mount, slug) {
+    var HP = window.HanimeProvider;
+    var sec = mount.querySelector('.ha-tagsec');
+    var strip = mount.querySelector('.ha-tagstrip');
+    var chipRow = mount.querySelector('.online-block .chip-row');
+    if (!HP || typeof HP.byTag !== 'function' || !sec || !strip || !chipRow) return;
+    var openTag = null, page = 0, loading = false, hasMore = true, seen = {};
+    var sentinel = document.createElement('span');
+    sentinel.className = 'ha-tag-sentinel';
+    function card(it) {
+      var s = it && it.ref && it.ref.slug;
+      return '<a class="poster-card" href="#/' + SEC_ID + '/online/hanime/' +
+        encodeURIComponent(s || '') + '"><span class="poster-img"><img src="' +
+        esc(it.image || '') + '" alt="' + esc(it.title || '') + '" loading="lazy"></span>' +
+        '<span class="poster-title">' + esc(it.title || '') + '</span>' +
+        '<span class="poster-meta">hanime</span></a>';
+    }
+    function close() {
+      openTag = null; sec.hidden = true; strip.innerHTML = '';
+      io.disconnect();
+      chipRow.querySelectorAll('[data-ha-tag].active').forEach(function (c) {
+        c.classList.remove('active');
+      });
+    }
+    function loadMore() {
+      if (loading || !hasMore || !openTag) return;
+      loading = true;
+      HP.byTag(openTag, page).then(function (r) {
+        loading = false;
+        var fresh = (r.items || []).filter(function (it) {
+          var s = it && it.ref && it.ref.slug;
+          if (!s || seen[s]) return false;
+          seen[s] = 1; return true;
+        });
+        if (fresh.length) {
+          var tmp = document.createElement('div');
+          tmp.innerHTML = fresh.map(card).join('');
+          while (tmp.firstChild) strip.insertBefore(tmp.firstChild, sentinel);
+          page += 1;
+        }
+        hasMore = !!r.hasMore && fresh.length > 0;
+        sentinel.style.display = hasMore ? '' : 'none';
+      }).catch(function () { loading = false; });
+    }
+    var io = new IntersectionObserver(function (es) {
+      if (es.some(function (e) { return e.isIntersecting; })) loadMore();
+    }, { root: strip, rootMargin: '200px' });
+    chipRow.addEventListener('click', function (e) {
+      var chip = e.target.closest('[data-ha-tag]');
+      if (!chip) return;
+      var t = chip.getAttribute('data-ha-tag');
+      if (t === openTag) { close(); return; }
+      chipRow.querySelectorAll('[data-ha-tag].active').forEach(function (c) {
+        c.classList.remove('active');
+      });
+      chip.classList.add('active');
+      openTag = t; page = 0; hasMore = true; seen = {};
+      sec.querySelector('h2').textContent = 'Videos tagged "' + t + '"';
+      strip.innerHTML = ''; strip.appendChild(sentinel);
+      sec.hidden = false;
+      io.disconnect(); io.observe(sentinel);
+      loadMore();
+    });
+  }
+
   function renderHanimeDetail(sec, mount, slug) {
     var HP = window.HanimeProvider;
     document.title = 'Loading… · ' + sec.name + ' · Media Player V2';
@@ -1955,6 +2024,7 @@
         if (ST && typeof ST.playHanime === 'function')
           ST.playHanime(slug, v.name || slug, v.poster_url || '');
       });
+      mountTagBrowser(mount, slug);
       window.scrollTo(0, 0);
     }
     HP.full(slug).then(function (d) {
@@ -2002,7 +2072,7 @@
     var stats = [fmtCompact(v.views) + ' views', fmtCompact(v.likes) + ' likes', bestQ, year]
       .filter(Boolean).join(' · ');
     var tags = ((v.tags) || []).slice(0, 20).map(function (t) {
-      return '<span class="chip">' + esc(t) + '</span>';
+      return '<button type="button" class="chip" data-ha-tag="' + esc(t) + '">' + esc(t) + '</button>';
     }).join('');
     var fr = d.franchise || {};
     var base = haSeriesBase(v.name);
@@ -2059,6 +2129,8 @@
           '</p></section>' : '') +
         (tags ? '<section class="online-block"><h2>Tags</h2><div class="chip-row">' + tags +
           '</div></section>' : '') +
+        (tags ? '<section class="online-block ha-tagsec" hidden><h2></h2>' +
+          '<div class="rel-strip ha-tagstrip"></div></section>' : '') +
         epRow + frRow + '</div></div>';
   }
 

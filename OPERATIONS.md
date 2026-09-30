@@ -768,3 +768,15 @@ Obey this on every update. Updated 2026-09-30.
     Verified jsdom with live data: Kakushi Dere 2 -> Episodes 1/2/3 with
     "Episode 2 · watching"; Itadaki! Seieki -> no Episodes row. Committed
     locally, NOT pushed, NOT phone-tested.
+47. 2026-10-01 — hanime details: clickable tag browser (Imran: tap a tag ->
+    new results strip between Tags and brand row, horizontal infinite
+    scroll; tap again closes). js/hanime-provider.js: new byTag(tag, page)
+    (worker has no tag endpoint; uses paginated /api/search?q={tag}).
+    js/anime-online.js: tag chips are now buttons [data-ha-tag]; new hidden
+    .ha-tagsec section between Tags and Episodes; new mountTagBrowser()
+    wired in renderHanimeDetail body(): tap opens strip ("Videos tagged
+    x"), IntersectionObserver sentinel at the strip end loads more pages
+    (deduped); same-tag tap closes, other-tag tap switches; cards link to
+    their own hanime details. Verified real Chromium 5/5: open 24 cards,
+    scroll -> 48 (page 2), re-click closes, switch tag reloads. Committed
+    locally, NOT pushed, NOT phone-tested.
