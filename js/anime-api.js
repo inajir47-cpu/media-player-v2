@@ -1312,9 +1312,37 @@
         return r;
       }
       return base().then(function (r) {
-        // Never show a bare/empty section: fall back to synthesized cards
-        // from the known total when the APIs come back empty.
-        if (!r.items.length && detail && detail.episodes) r = synthEpisodes(detail, page);
+        var total = detail && detail.episodes;
+        if (total && !r.hasMore && r.items.length < total) {
+          // Partial provider data but the list is claimed complete (e.g.
+          // Jikan rate-limited -> streaming-only fallback, or a provider
+          // that documents fewer episodes than the known total): keep the
+          // real cards and synthesize the missing numbers, so the grid
+          // always matches the "Episodes · N" heading instead of stopping
+          // early.
+          var have = {}, maxN = 0, n;
+          r.items.forEach(function (it) { have[it.n] = true; if (it.n > maxN) maxN = it.n; });
+          if (page === 1) {
+            // Fresh strip: fill every missing number 1..total.
+            for (n = 1; n <= total; n++) {
+              if (!have[n]) r.items.push({ n: n, title: 'Episode ' + n, date: '',
+                ts: null, minutes: detail.durationMin || null, thumb: '', url: '' });
+            }
+          } else if (r.items.length) {
+            // Later pages append to the strip: only extend the tail beyond
+            // the highest number provided, so nothing duplicates.
+            for (n = maxN + 1; n <= total; n++) {
+              r.items.push({ n: n, title: 'Episode ' + n, date: '',
+                ts: null, minutes: detail.durationMin || null, thumb: '', url: '' });
+            }
+          }
+          r.items.sort(function (a, b) { return a.n - b.n; });
+          r.total = total;
+        } else if (!r.items.length && total) {
+          // Never show a bare/empty section: fall back to synthesized cards
+          // from the known total when the APIs come back empty.
+          r = synthEpisodes(detail, page);
+        }
         return withAirDates(r);
       }).then(function (r) {
         return fill(r);

@@ -458,6 +458,22 @@ Obey this on every update. Updated 2026-09-30.
     links/bold/strike intact, broken img hides, loaded img stays visible
     within body, light-mode rule present). NOT phone-tested — only Imran's
     device counts.
+27. 2026-09-30 — Episode list truncation fix (Imran approved the exact diff
+    before apply; detail header said "Episodes · 19 listed" but the grid
+    stopped at 11). Root cause: the synth fallback in `js/anime-api.js`
+    `episodes()` only fired on ZERO provider items, but Jikan
+    rate-limit/empty failures fall back to `streamEpsFallback()` — a
+    SUBSET of streaming episodes with hardcoded `hasMore:false` — so the
+    strip never loaded more. Fix: when the known total exists, the provider
+    claims the list is complete (`!hasMore`), but returned fewer items,
+    the missing numbers are synthesized (real cards kept untouched, still
+    get air dates + TMDB stills downstream). Page 1 fills all missing
+    1..N; later pages only extend the tail beyond the highest provided
+    number (the strip appends, so no duplicates); empty later pages left
+    alone. Verified node 9/9 (reported-bug case, full pages untouched,
+    page-2 tail fill without dupes, empty-page fallback, unknown total
+    untouched, gappy provider). Chapters use a different pattern (no synth
+    fallback) — left alone. NOT phone-tested — only Imran's device counts.
 
 ## Standing rules — obey on every update
 
