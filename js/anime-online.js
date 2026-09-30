@@ -323,7 +323,7 @@
     var entry = {
       provider: provider, id: id, title: d.title, image: d.image || '',
       mediaType: mt, format: d.format || '', isAdult: !!d.isAdult,
-      href: '#/' + SEC_ID + '/online/' + provider + '/' + (isManga ? 'manga/' : '') + id,
+      href: d.href || '#/' + SEC_ID + '/online/' + provider + '/' + (isManga ? 'manga/' : '') + id,
       viewedAt: Date.now()
     };
     var list = getRecentlyViewed(isManga).filter(function (e) {
@@ -1159,10 +1159,14 @@
   function godCard(item) {
     var ref = item.ref || {};
     var attrs = ' data-god-kind="' + ref.kind + '"';
-    if (ref.kind === 'hindi') attrs += ' data-god-title="' + esc(item.title) + '"';
+    if (ref.kind === 'hindi')
+      attrs += ' data-god-title="' + esc(item.title) + '"' +
+               ' data-god-slug="' + esc(ref.slug || '') + '"';
     else if (ref.kind === 'reanime')
       attrs += ' data-god-anilist="' + (ref.anilistId || '') + '" data-god-title="' + esc(item.title) + '"';
-    else if (ref.kind === 'mangadex') attrs += ' data-god-uuid="' + esc(ref.uuid || '') + '"';
+    else if (ref.kind === 'mangadex')
+      attrs += ' data-god-uuid="' + esc(ref.uuid || '') + '"' +
+               ' data-god-title="' + esc(item.title) + '"';
     else if (ref.kind === 'nhentai')
       attrs += ' data-god-nhid="' + esc(String(ref.id || '')) + '" data-god-title="' + esc(item.title) + '"';
     else if (ref.kind === 'hitomi')
@@ -1191,24 +1195,77 @@
       ' from provider servers</p></div>' +
       '<div class="poster-grid online-grid">' + list.map(godCard).join('') + '</div>';
   }
+  // Recently Viewed logging for God Mode taps. Kinds with a real detail
+  // route (reanime + AniList ID) link straight to it; kinds without one
+  // (mangadex uuid, hindi title, adult galleries) fall back to the search
+  // view so the card never links to a dead page.
+  function godRecordView(card, kind) {
+    var img = card.querySelector('img');
+    var title = card.getAttribute('data-god-title') || '';
+    if (!title) return;
+    var image = img ? (img.getAttribute('src') || '') : '';
+    var id = '', provider = kind, mediaType = '', href = '#/' + SEC_ID + '/search';
+    if (kind === 'mangadex') {
+      id = card.getAttribute('data-god-uuid') || title; mediaType = 'MANGA';
+    } else if (kind === 'hindi') {
+      id = card.getAttribute('data-god-slug') || title;
+    } else if (kind === 'reanime') {
+      id = card.getAttribute('data-god-anilist') || title;
+      if (card.getAttribute('data-god-anilist'))
+        href = '#/' + SEC_ID + '/online/' + API().getProvider() + '/' + id;
+    } else if (kind === 'nhentai' || kind === 'hitomi') {
+      id = card.getAttribute(kind === 'nhentai' ? 'data-god-nhid' : 'data-god-hitomi') || title;
+      mediaType = 'MANGA';
+    } else { return; }
+    recordView({ title: title, image: image, mediaType: mediaType, href: href,
+                 isAdult: (kind === 'nhentai' || kind === 'hitomi') },
+               provider, id, mediaType);
+  }
+  // MangaDex God Mode tap: no auto-open. Show the EN chapter feed in a
+  // picker popup; the reader opens only on the chapter the user picks.
+  function openGodChapterPicker(card) {
+    var uuid = card.getAttribute('data-god-uuid');
+    var title = card.getAttribute('data-god-title') || 'Manga';
+    var MR = window.MPV2 && window.MPV2.MangaReader;
+    if (!uuid || !MR) return;
+    if (window.MPV2.toast) window.MPV2.toast('Loading chapters\u2026');
+    MR.chapterFeed(uuid, 'en').then(function (chs) {
+      var list = (chs || []).filter(function (c) { return c && c.id; })
+        .sort(function (x, y) { return parseFloat(x.ch) - parseFloat(y.ch); });
+      if (!list.length) throw new Error('no chapters');
+      var rows = list.map(function (c) {
+        return '<button type="button" class="god-chap" data-chap="' + esc(c.id) + '">' +
+          '<b>Ch ' + esc(String(c.ch == null ? '?' : c.ch)) + '</b>' +
+          (c.title ? '<span>' + esc(c.title) + '</span>' : '') + '</button>';
+      }).join('');
+      var scrim = openPopup(title, list.length + ' chapters \u00b7 pick one to start reading',
+        '<div class="god-chaplist">' + rows + '</div>');
+      scrim.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-chap]');
+        if (!b) return;
+        var chId = b.getAttribute('data-chap');
+        var ch = null;
+        list.forEach(function (c) { if (c.id === chId) ch = c; });
+        if (!ch) return;
+        closePopup();
+        if (window.MPV2.toast) window.MPV2.toast('Opening chapter\u2026');
+        MR.chapterPages(ch.id).then(function (pages) {
+          MR.openReader({ uuid: uuid, ctx: {},
+            chapter: { id: ch.id, ch: ch.ch, title: ch.title, pages: pages } });
+        }).catch(function () { if (window.MPV2.toast) window.MPV2.toast('Could not open this chapter.'); });
+      });
+    }).catch(function () { if (window.MPV2.toast) window.MPV2.toast('Could not load chapters.'); });
+  }
   // Tap routing for God Mode cards (delegated from the search view).
   function openGodCard(card) {
     if (!card) return;
     var kind = card.getAttribute('data-god-kind');
+    // Recently Viewed on every tap. Adult galleries log only after the 18+
+    // Proceed below, so a cancelled warning leaves no trace (same rule as
+    // the standard detail page).
+    if (kind !== 'nhentai' && kind !== 'hitomi') godRecordView(card, kind);
     if (kind === 'mangadex') {
-      var uuid = card.getAttribute('data-god-uuid');
-      var MR = window.MPV2 && window.MPV2.MangaReader;
-      if (!uuid || !MR) return;
-      if (window.MPV2.toast) window.MPV2.toast('Opening manga\u2026');
-      MR.chapterFeed(uuid, 'en').then(function (chs) {
-        var first = (chs || []).filter(function (c) { return c && c.id; })
-          .sort(function (x, y) { return parseFloat(x.ch) - parseFloat(y.ch); })[0];
-        if (!first) throw new Error('no chapters');
-        return MR.chapterPages(first.id).then(function (pages) {
-          MR.openReader({ uuid: uuid, ctx: {},
-            chapter: { id: first.id, ch: first.ch, title: first.title, pages: pages } });
-        });
-      }).catch(function () { if (window.MPV2.toast) window.MPV2.toast('Could not open this manga.'); });
+      openGodChapterPicker(card); // manual chapter choice, no auto-open
     } else if (kind === 'hindi') {
       // No meta ID for Hindi-only titles: title-match straight into the
       // existing provider dialog (same as the movie Play button flow).
@@ -1232,6 +1289,7 @@
       var MR2 = window.MPV2 && window.MPV2.MangaReader;
       if (!nhid || !NHP || !MR2) return;
       adultWarnModal({ title: nht }, function () {
+        godRecordView(card, kind); // log only on Proceed, not on tap
         if (window.MPV2.toast) window.MPV2.toast('Opening gallery\u2026');
         NHP.galleryPages(nhid).then(function (p) {
           if (!p || !p.pages || !p.pages.length) throw new Error('no pages');
@@ -1248,6 +1306,7 @@
       var MR3 = window.MPV2 && window.MPV2.MangaReader;
       if (!htid || !HTP || !MR3) return;
       adultWarnModal({ title: htt }, function () {
+        godRecordView(card, kind); // log only on Proceed, not on tap
         if (window.MPV2.toast) window.MPV2.toast('Opening gallery\u2026');
         HTP.galleryPages(htid).then(function (p) {
           if (!p || !p.pages || !p.pages.length) throw new Error('no pages');
