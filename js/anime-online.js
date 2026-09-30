@@ -1221,40 +1221,96 @@
                  isAdult: (kind === 'nhentai' || kind === 'hitomi') },
                provider, id, mediaType);
   }
-  // MangaDex God Mode tap: no auto-open. Show the EN chapter feed in a
-  // picker popup; the reader opens only on the chapter the user picks.
-  function openGodChapterPicker(card) {
+  // Strip Hindi-provider suffixes so the AniList match runs on the core title.
+  function godCleanHindi(t) {
+    var q = String(t || ''), prev;
+    var re = /\s*(hindi(\s*dub(bed)?)?|dubbed|episodes?|season\s*\d*|download(\s*hd)?)\s*$/i;
+    do { prev = q; q = q.replace(re, ''); } while (q !== prev);
+    return q.trim();
+  }
+  // True when the AniList top hit is the same title: normalized containment
+  // either way (AniList fuzzy search already ranked it first).
+  function godTitleMatch(raw, candidate) {
+    function norm(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+    var a = norm(raw), b = norm(candidate);
+    if (!a || !b) return false;
+    return a.indexOf(b) !== -1 || b.indexOf(a) !== -1;
+  }
+  // MangaDex God Mode tap: no auto-open. Adaptive info view built strictly
+  // from the provider payload — poster, status/year/chapter stats,
+  // description, tags, then the EN chapter list. Missing fields are omitted,
+  // never break the layout. The reader opens only on the chapter picked.
+  function openGodMangaDetail(card) {
     var uuid = card.getAttribute('data-god-uuid');
-    var title = card.getAttribute('data-god-title') || 'Manga';
+    var cardTitle = card.getAttribute('data-god-title') || 'Manga';
+    var cardImg = card.querySelector('img');
+    var cardPoster = cardImg ? (cardImg.getAttribute('src') || '') : '';
     var MR = window.MPV2 && window.MPV2.MangaReader;
     if (!uuid || !MR) return;
-    if (window.MPV2.toast) window.MPV2.toast('Loading chapters\u2026');
-    MR.chapterFeed(uuid, 'en').then(function (chs) {
-      var list = (chs || []).filter(function (c) { return c && c.id; })
+    if (window.MPV2.toast) window.MPV2.toast('Loading info…');
+    function mdDetail(u) {
+      return fetch('https://api.mangadex.org/manga/' + u +
+        '?includes%5B%5D=cover_art&includes%5B%5D=author',
+        { headers: { 'Accept': 'application/json' } })
+        .then(function (r) { if (!r.ok) throw new Error('md ' + r.status); return r.json(); })
+        .then(function (j) { return (j || {}).data || null; }, function () { return null; });
+    }
+    function godCap(s) { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); }
+    Promise.all([mdDetail(uuid), MR.chapterFeed(uuid, 'en')]).then(function (res) {
+      var m = res[0], attrs = (m && m.attributes) || {};
+      var t = attrs.title || {};
+      var title = t.en || t[Object.keys(t)[0]] || cardTitle;
+      var desc = attrs.description || {};
+      var description = desc.en || desc[Object.keys(desc)[0]] || '';
+      var poster = cardPoster;
+      ((m && m.relationships) || []).forEach(function (rel) {
+        if (rel.type === 'cover_art' && rel.attributes && rel.attributes.fileName && !poster)
+          poster = 'https://uploads.mangadex.org/covers/' + uuid + '/' + rel.attributes.fileName;
+      });
+      var tags = (attrs.tags || []).map(function (g) {
+        return (((g.attributes || {}).name || {}).en) || '';
+      }).filter(Boolean).slice(0, 8);
+      var chs = (res[1] || []).filter(function (c) { return c && c.id; })
         .sort(function (x, y) { return parseFloat(x.ch) - parseFloat(y.ch); });
-      if (!list.length) throw new Error('no chapters');
-      var rows = list.map(function (c) {
+      if (!chs.length) throw new Error('no chapters');
+      var meta = [];
+      if (attrs.status) meta.push('<span class="god-dstat">' + esc(godCap(attrs.status)) + '</span>');
+      if (attrs.year) meta.push('<span class="god-dstat">' + esc(String(attrs.year)) + '</span>');
+      meta.push('<span class="god-dstat">' + chs.length + ' chapters</span>');
+      var rows = chs.map(function (c) {
         return '<button type="button" class="god-chap" data-chap="' + esc(c.id) + '">' +
           '<b>Ch ' + esc(String(c.ch == null ? '?' : c.ch)) + '</b>' +
           (c.title ? '<span>' + esc(c.title) + '</span>' : '') + '</button>';
       }).join('');
-      var scrim = openPopup(title, list.length + ' chapters \u00b7 pick one to start reading',
-        '<div class="god-chaplist">' + rows + '</div>');
+      var body =
+        '<div class="god-detail" data-tone-root>' +
+          (poster ? '<img class="god-dposter" src="' + esc(poster) + '" alt="' + esc(title) + ' poster">' : '') +
+          '<div class="god-dinfo">' +
+            (meta.length ? '<div class="god-dmeta">' + meta.join('') + '</div>' : '') +
+            (description ? '<p class="god-ddesc">' + esc(description) + '</p>' : '') +
+            (tags.length ? '<div class="god-dtags">' + tags.map(function (g) {
+                return '<span class="god-dtag">' + esc(g) + '</span>'; }).join('') + '</div>' : '') +
+          '</div>' +
+        '</div>' +
+        '<div class="god-chaplist">' + rows + '</div>';
+      var scrim = openPopup(title, 'MangaDex · pick a chapter to start reading', body);
+      tintFromPoster(scrim, poster); // 0.6s --tone cross-fade, same as detail pages
       scrim.addEventListener('click', function (e) {
         var b = e.target.closest('[data-chap]');
         if (!b) return;
         var chId = b.getAttribute('data-chap');
         var ch = null;
-        list.forEach(function (c) { if (c.id === chId) ch = c; });
+        chs.forEach(function (c) { if (c.id === chId) ch = c; });
         if (!ch) return;
         closePopup();
-        if (window.MPV2.toast) window.MPV2.toast('Opening chapter\u2026');
+        if (window.MPV2.toast) window.MPV2.toast('Opening chapter…');
         MR.chapterPages(ch.id).then(function (pages) {
-          MR.openReader({ uuid: uuid, ctx: {},
+          MR.openReader({ uuid: uuid,
+            ctx: { title: title, poster: poster, href: location.hash, readerProvider: 'mangadex' },
             chapter: { id: ch.id, ch: ch.ch, title: ch.title, pages: pages } });
         }).catch(function () { if (window.MPV2.toast) window.MPV2.toast('Could not open this chapter.'); });
       });
-    }).catch(function () { if (window.MPV2.toast) window.MPV2.toast('Could not load chapters.'); });
+    }).catch(function () { if (window.MPV2.toast) window.MPV2.toast('Could not load this title.'); });
   }
   // Tap routing for God Mode cards (delegated from the search view).
   function openGodCard(card) {
@@ -1265,12 +1321,29 @@
     // the standard detail page).
     if (kind !== 'nhentai' && kind !== 'hitomi') godRecordView(card, kind);
     if (kind === 'mangadex') {
-      openGodChapterPicker(card); // manual chapter choice, no auto-open
+      openGodMangaDetail(card); // adaptive detail view, no auto-open
     } else if (kind === 'hindi') {
-      // No meta ID for Hindi-only titles: title-match straight into the
-      // existing provider dialog (same as the movie Play button flow).
+      // AniList-first: if our main database has this title, open its real
+      // info page (fully standard from there). Otherwise fall back to the
+      // provider payload via the existing server dialog.
       var title = card.getAttribute('data-god-title');
-      if (title && window.MPV2.Stream) window.MPV2.Stream.playEpisode({ title: title }, 1);
+      var himg = card.querySelector('img');
+      var hposter = himg ? (himg.getAttribute('src') || '') : '';
+      var hslug = card.getAttribute('data-god-slug') || '';
+      var HAPI = window.MPV2.AnimeAPI, HS = window.MPV2.Stream;
+      function hindiDialog() {
+        if (title && HS) HS.playEpisode({ title: title, poster: hposter,
+          provider: 'hindi', pid: hslug || title }, 1);
+      }
+      if (title && HAPI) {
+        if (window.MPV2.toast) window.MPV2.toast('Finding info…');
+        HAPI.search('anilist', godCleanHindi(title)).then(function (r) {
+          var hit = r && r.anime && r.anime[0];
+          if (hit && hit.id && godTitleMatch(title, hit.title))
+            location.hash = '#/animation/online/anilist/' + hit.id;
+          else hindiDialog();
+        }).catch(hindiDialog);
+      } else hindiDialog();
     } else if (kind === 'reanime') {
       var aid = card.getAttribute('data-god-anilist');
       var API = window.MPV2.AnimeAPI;
@@ -1293,7 +1366,10 @@
         if (window.MPV2.toast) window.MPV2.toast('Opening gallery\u2026');
         NHP.galleryPages(nhid).then(function (p) {
           if (!p || !p.pages || !p.pages.length) throw new Error('no pages');
-          MR2.openReader({ uuid: 'nhentai:' + nhid, ctx: {},
+          var nimg = card.querySelector('img');
+          MR2.openReader({ uuid: 'nhentai:' + nhid,
+            ctx: { title: nht, poster: nimg ? (nimg.getAttribute('src') || '') : '',
+                   href: location.hash, readerProvider: 'nhentai' },
             chapter: { id: 'nh-' + nhid, ch: '1', title: p.title, pages: p.pages } });
         }).catch(function () { if (window.MPV2.toast) window.MPV2.toast('Could not open this gallery.'); });
       });
@@ -1310,7 +1386,10 @@
         if (window.MPV2.toast) window.MPV2.toast('Opening gallery\u2026');
         HTP.galleryPages(htid).then(function (p) {
           if (!p || !p.pages || !p.pages.length) throw new Error('no pages');
-          MR3.openReader({ uuid: 'hitomi:' + htid, ctx: {},
+          var htimg = card.querySelector('img');
+          MR3.openReader({ uuid: 'hitomi:' + htid,
+            ctx: { title: htt, poster: htimg ? (htimg.getAttribute('src') || '') : '',
+                   href: location.hash, readerProvider: 'hitomi' },
             chapter: { id: 'ht-' + htid, ch: '1', title: p.title, pages: p.pages } });
         }).catch(function () { if (window.MPV2.toast) window.MPV2.toast('Could not open this gallery.'); });
       });

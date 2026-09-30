@@ -57,7 +57,9 @@
     return (m && typeof m === 'object') ? m : {};
   }
   function saveEpProgress(entry) {
-    if (!entry || entry.kind === 'movie') return;
+    // Chapter progress already lives in the manga store; keep the
+    // anime episode map clean.
+    if (!entry || entry.kind === 'movie' || entry.kind === 'manga') return;
     var n = parseInt(entry.episode, 10);
     if (!(n > 0)) return;
     var m = getEpProgressMap();

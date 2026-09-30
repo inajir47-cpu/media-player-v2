@@ -242,6 +242,56 @@ Obey this on every update. Updated 2026-09-30.
     detail route, all three kinds logged with correct hrefs). Local commit
     6e34b9c, NOT pushed (needs fresh PAT). Phone test pending.
 
+18. 2026-09-30 — Final Combined Update: God Mode routing, adaptive layout,
+    history & theme polish (Imran approved exact diffs, then confirmed
+    apply). `js/anime-online.js`:
+    - Hindi tap is now AniList-first: `godCleanHindi()` strips provider
+      suffixes (Hindi/Hindi Dub/Dubbed/Episodes/Season N/Download HD), the
+      cleaned title is searched on AniList, `godTitleMatch()` compares the
+      top hit by normalized containment, and a match opens the real detail
+      page `#/animation/online/anilist/<id>`. No match falls back to the
+      existing provider dialog with a full streaming ctx
+      (title/poster/provider:'hindi'/pid) — so video History entries now
+      carry posters.
+    - MangaDex tap opens the new adaptive `openGodMangaDetail()` info view:
+      provider metadata (title/poster/status/year/chapter count/description/
+      up to 8 tags) fetched in parallel with the EN chapter feed; missing
+      fields are omitted, never break the layout. Reader opens only on the
+      picked chapter, with enriched ctx
+      (title/poster/href/readerProvider:'mangadex').
+    - nhentai/Hitomi keep the exact 18+ warning/direct-reader flow; reader
+      ctx enriched the same way (title/poster/href/readerProvider).
+    `js/manga-reader.js`: `saveProgress()` now also calls `MPV2.Watch.upsert()`
+    (throttled to 1 write per 8s per chapter) with kind:'manga', poster,
+    href, provider, chapter/episode, chapterId, page position/duration —
+    chapter reads land in the actual History Tab like video watches.
+    `js/manga-source.js`: `openEntry()` takes the full ctx (title/poster/
+    href/readerProvider) instead of a bare title string; both callers
+    updated. `js/app.js`: `historyCardHtml()` renders manga entries
+    (`CH <n>` badge, `Ch <n> · page <cur>/<total>`, Completed at the done
+    threshold); new `reopenMangaEntry()` resumes nhentai/Hitomi/MangaDex
+    reads from History Continue (re-resolves pages, restores ctx);
+    `wireRecentWatched()` routes manga entries to it before video playback.
+    `js/watch-history.js`: manga entries excluded from the anime
+    episode-progress map (chapter progress stays in its dedicated store).
+    `css/anime-online.css`: scoped `.god-detail`/`.god-dposter`/`.god-dinfo`/
+    `.god-dmeta`/`.god-dstat`/`.god-ddesc`/`.god-dtags`/`.god-dtag` styles,
+    OLED `#0a0a0c`-family, `.god-detail` carries `transition: --tone .6s`
+    and `tintFromPoster()` is called on the popup. No badge, rating, global
+    theme, provider-dialog, or external-warning logic touched.
+    Verified: real Chromium **19/19** with canned AniList/MangaDex
+    responses — Hindi match routes to the AniList detail page (query proven
+    cleaned to "Naruto Shippuden"), no-match opens the provider dialog with
+    full ctx and zero autoplay, detail popup shows poster/stats/desc/tags
+    with chapters in order and no auto-reader, bare payload omits
+    desc/tags gracefully, chapter pick writes a complete manga Watch entry,
+    History card shows `CH 1`, Continue reopens the reader (no video
+    element), nhentai 18+ gate intact with enriched ctx in history, reanime
+    routing unchanged, ext-confirm popup still `#0a0a0c`/`#232326`,
+    `--tone` set from the poster. Screenshot: `v2-godmode-detail.png`.
+    Local commit, NOT pushed (needs fresh PAT). Phone test pending —
+    only Imran's device counts.
+
 ## Standing rules — obey on every update
 
 - Build strictly part-by-part; surgical changes only; **diagnose the exact cause before rebuilding**.

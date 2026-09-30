@@ -122,13 +122,15 @@
     return out;
   }
   /* Open the reader for one chapter entry, feeding prev/next from the feed. */
-  function openEntry(uuid, title, entry, lang, presorted) {
+  function openEntry(uuid, ctx, entry, lang, presorted) {
     function go(sorted) {
       var idx = idxOf(sorted, entry);
       if (idx < 0) idx = idxOfNum(sorted, entry.ch);
       if (idx < 0) { toast('Chapter not available in ' + (lang === 'ja' ? 'Japanese' : 'English')); return; }
       MR().openReader({
-        ctx: { title: title }, uuid: uuid,
+        ctx: { title: ctx.title || '', poster: ctx.image || '',
+               href: location.hash, readerProvider: 'mangadex' },
+        uuid: uuid,
         chapter: sorted[idx], lang: lang,
         siblings: siblingsAround(sorted, idx)
       });
@@ -241,7 +243,7 @@
         return entryChapter(uuid, lang).then(function (entry) {
           if (!entry) { toast('No chapters found in ' + selLang); return; }
           closeDialog();
-          return openEntry(uuid, ctx.title, entry, lang);
+          return openEntry(uuid, ctx, entry, lang);
         });
       }).catch(function () {
         toast('Could not load chapters');
@@ -262,7 +264,7 @@
       return feedSorted(uuid, lang).then(function (sorted) {
         var idx = idxOfNum(sorted, chNumStr);
         if (idx < 0) { toast('Chapter ' + chNumStr + ' is not available in ' + (lang === 'ja' ? 'Japanese' : 'English')); return; }
-        return openEntry(uuid, ctx.title, sorted[idx], lang, sorted);
+        return openEntry(uuid, ctx, sorted[idx], lang, sorted);
       });
     }).catch(function () {
       toast('Could not load chapter');

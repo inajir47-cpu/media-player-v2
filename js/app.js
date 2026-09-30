@@ -363,8 +363,14 @@
     var W = window.MPV2.Watch;
     var pct = W.progressPct(e);
     var done = W.isDone(e);
-    var badge = e.kind === 'movie' ? 'MOVIE' : ('S' + (e.season || 1) + ' E' + e.episode);
-    var meta = (e.lang ? e.lang + ' · ' : '') + (done ? 'Completed' : (e.position > 3 ? W.fmtLeft(e) : 'Just started'));
+    var badge = e.kind === 'movie' ? 'MOVIE'
+      : e.kind === 'manga' ? ('CH ' + (e.episode || '?'))
+      : ('S' + (e.season || 1) + ' E' + e.episode);
+    var meta = e.kind === 'manga'
+      ? ('Ch ' + (e.episode || '?') + ' · page ' +
+         Math.min((e.position || 0) + 1, Math.max(e.duration || 1, 1)) + '/' + (e.duration || '?') +
+         (done ? ' · Completed' : ''))
+      : ((e.lang ? e.lang + ' · ' : '') + (done ? 'Completed' : (e.position > 3 ? W.fmtLeft(e) : 'Just started')));
     return '<article class="rw-card">' +
       (removable ? '<button type="button" class="rw-remove" data-rw-remove="' + esc(e.key) +
         '" aria-label="Remove ' + esc(e.title || 'this title') + ' from history">' + icon('x') + '</button>' : '') +
@@ -435,6 +441,34 @@
       recentWatchedHtml(sec);
   }
 
+  // History Tab: resume a manga chapter read (God Mode or standard flow)
+  // by re-resolving its pages, then opening the reader with the saved ctx.
+  function reopenMangaEntry(e) {
+    var MR = window.MPV2 && window.MPV2.MangaReader;
+    if (!MR || !e.pid || !e.chapterId) return;
+    if (window.MPV2.toast) window.MPV2.toast('Opening chapter…');
+    function openWith(pages, chTitle) {
+      MR.openReader({ uuid: e.pid,
+        ctx: { title: e.title, poster: e.poster, href: e.href,
+               readerProvider: e.provider },
+        chapter: { id: e.chapterId, ch: e.episode, title: chTitle || '', pages: pages } });
+    }
+    function fail() { if (window.MPV2.toast) window.MPV2.toast('Could not open this chapter.'); }
+    if (e.provider === 'nhentai' && window.MPV2.NHentai) {
+      window.MPV2.NHentai.galleryPages(String(e.pid).replace(/^nhentai:/, ''))
+        .then(function (p) { openWith(p.pages, p.title); }).catch(fail);
+    } else if (e.provider === 'hitomi' && window.MPV2.Hitomi) {
+      window.MPV2.Hitomi.galleryPages(String(e.pid).replace(/^hitomi:/, ''))
+        .then(function (p) { openWith(p.pages, p.title); }).catch(fail);
+    } else {
+      MR.chapterFeed(e.pid, 'en').then(function (chs) {
+        var ch = null;
+        (chs || []).forEach(function (c) { if (c && c.id === e.chapterId) ch = c; });
+        if (!ch) throw new Error('chapter gone');
+        return MR.chapterPages(ch.id).then(function (pages) { openWith(pages, ch.title); });
+      }).catch(fail);
+    }
+  }
   // Recently Watched: continue buttons resume playback directly.
   function wireRecentWatched(root) {
     root.querySelectorAll('[data-rw-play]').forEach(function (b) {
@@ -444,6 +478,7 @@
         if (!W || !S) return;
         var e = W.getEntry(b.getAttribute('data-rw-play'));
         if (!e) return;
+        if (e.kind === 'manga') { reopenMangaEntry(e); return; }
         S.playEpisode({
           anilistId: e.anilistId, title: e.title, poster: e.poster,
           provider: e.provider, pid: e.pid, isMovie: e.kind === 'movie'

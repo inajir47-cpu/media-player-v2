@@ -970,6 +970,20 @@ button.trailer-btn { cursor: pointer; font-family: inherit; }
 .adult18.god-adult { position: absolute; top: 8px; left: 8px; z-index: 3; }
 .god-langbadges { position: absolute; left: 8px; bottom: 8px; z-index: 3;
   display: flex; gap: 4px; pointer-events: none; }
+/* God Mode MangaDex adaptive detail view (popup): poster + provider payload. */
+.god-detail { display: flex; gap: 14px; margin-bottom: 14px; transition: --tone .6s ease; }
+.god-dposter { width: 108px; flex: none; border-radius: 12px; border: 1px solid #232326;
+  align-self: flex-start; box-shadow: 0 6px 28px -10px var(--tone); }
+.god-dinfo { flex: 1; min-width: 0; }
+.god-dmeta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.god-dstat { font-size: 11px; padding: 3px 9px; border-radius: 99px;
+  background: #17171b; border: 1px solid #232326; color: #d4d4d8; }
+.god-ddesc { font-size: 13px; line-height: 1.55; color: #a1a1aa; margin: 0 0 10px;
+  display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+.god-dtags { display: flex; flex-wrap: wrap; gap: 6px; }
+.god-dtag { font-size: 11px; padding: 3px 9px; border-radius: 99px; color: #e4e4e7;
+  background: #17171b; background: color-mix(in srgb, var(--tone) 16%, #101014);
+  border: 1px solid #232326; }
 /* God Mode chapter picker (MangaDex tap): manual chapter choice, no auto-open. */
 .god-chaplist { display: flex; flex-direction: column; gap: 6px; max-height: 60vh; overflow-y: auto; }
 .god-chap { display: flex; align-items: baseline; gap: 10px; width: 100%; text-align: left;

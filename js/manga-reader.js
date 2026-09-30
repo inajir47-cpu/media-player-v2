@@ -350,9 +350,36 @@
     }
   }
 
+  var lastHistCh = '', lastHistAt = 0;
   function saveProgress() {
     if (!R || !R.pages.length) return;
     saveChProgress(R.uuid, R.chapter.id, R.chapter.ch, R.page, R.pages.length);
+    logWatchHistory();
+  }
+  /* Chapter reads land in the History Tab exactly like video watches.
+     Title/poster/href arrive via the opener's ctx (God Mode passes all
+     three; the standard flow passes title). Page turns are throttled. */
+  function logWatchHistory() {
+    var W = window.MPV2 && window.MPV2.Watch;
+    if (!W || !R || !R.pages.length) return;
+    var now = Date.now();
+    if (R.chapter.id === lastHistCh && now - lastHistAt < 8000) return;
+    lastHistCh = R.chapter.id; lastHistAt = now;
+    var ctx = R.ctx || {}, chNum = R.chapter.ch;
+    W.upsert({
+      key: 'manga:' + R.uuid,
+      kind: 'manga',
+      title: ctx.title || R.chapter.title || 'Manga',
+      poster: ctx.poster || '',
+      href: ctx.href || location.hash,
+      provider: ctx.readerProvider || '',
+      pid: String(R.uuid),
+      episode: chNum == null ? '' : String(chNum),
+      chapterId: R.chapter.id,
+      position: R.page,
+      duration: R.pages.length,
+      lang: R.lang || ''
+    });
   }
 
   function updateChrome() {
