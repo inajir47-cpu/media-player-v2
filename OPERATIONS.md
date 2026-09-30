@@ -740,7 +740,7 @@ Obey this on every update. Updated 2026-09-30.
     with slug dedup across pages; state.hasMore drives the existing
     sentinel observer for infinite scroll. Manga stays in God Mode
     search. Verified live: 105 unique videos across 3 pages.
-    Committed locally, NOT pushed, NOT phone-tested.
+    PUSHED 2026-10-01 ~01:56 +04 (PAT transient, scrubbed). NOT phone-tested.
 45. 2026-10-01 — hanime details page (Imran: "what about their details
     page", approved "BUILD it"). Tapping a hanime card (genre grid or God
     Mode search) now opens #/animation/online/hanime/{slug} instead of
@@ -756,5 +756,4 @@ Obey this on every update. Updated 2026-09-30.
     Reuses the real detail-page CSS classes (detail-hero, poster-img big,
     detail-copy, rel-strip, etc.). Verified jsdom with live worker data:
     title/meta/tags(16)/related(10)/play/back all render; rel links point
-    at the hanime detail route. Committed locally, NOT pushed, NOT
-    phone-tested.
+    at the hanime detail route. PUSHED 2026-10-01 ~01:56 +04 (PAT transient, scrubbed). NOT phone-tested.
