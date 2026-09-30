@@ -682,8 +682,19 @@ button.trailer-btn { cursor: pointer; font-family: inherit; }
 .hero-dots button {
   width: 26px; height: 5px; border-radius: 3px; border: 0; cursor: pointer;
   background: rgba(255,255,255,.28); transition: background .3s;
+  position: relative; overflow: hidden; padding: 0;
 }
-.hero-dots button.active { background: #fff; }
+.hero-dots button::after {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 0%;
+  background: #fff; border-radius: 3px;
+}
+.hero-carousel.hero-auto .hero-dots button.active::after {
+  animation: hero-dot-fill 15s linear forwards;
+}
+@keyframes hero-dot-fill {
+  from { width: 0%; }
+  to { width: 100%; }
+}
 @media (max-width: 640px) {
   .hero-carousel { height: 380px; border-radius: 16px; }
   .hero-copy { left: 152px; right: 18px; bottom: 56px; }

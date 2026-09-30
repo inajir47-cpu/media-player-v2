@@ -469,14 +469,32 @@
       cur = ((i % n) + n) % n;
       var els = track.querySelectorAll('.hero-slide');
       Array.prototype.forEach.call(els, function (el, k) { el.classList.toggle('active', k === cur); });
-      Array.prototype.forEach.call(dots.children, function (d, k) { d.classList.toggle('active', k === cur); });
+      restartDotFill();
       heroVideoFor(wrap, slides[cur], cur);
+    }
+    // Re-marks the active dot, restarting its progress-fill animation cleanly
+    // (even when re-selecting the already-active dot). The fill only animates
+    // while .hero-auto is set, i.e. auto-advance is actually running.
+    function restartDotFill() {
+      Array.prototype.forEach.call(dots.children, function (d) { d.classList.remove('active'); });
+      var d = dots.children[cur];
+      if (!d) return;
+      void d.offsetWidth;
+      d.classList.add('active');
     }
     function play() {
       stop();
-      if (n > 1 && detailVideoAllowed()) timer = setInterval(function () { activate(cur + 1); }, 10000);
+      wrap.classList.remove('hero-auto');
+      if (n > 1 && detailVideoAllowed()) {
+        timer = setInterval(function () { activate(cur + 1); }, 15000);
+        wrap.classList.add('hero-auto');
+      }
+      restartDotFill();
     }
-    function stop() { if (timer) { clearInterval(timer); timer = null; } }
+    function stop() {
+      if (timer) { clearInterval(timer); timer = null; }
+      wrap.classList.remove('hero-auto');
+    }
     wrap.addEventListener('click', function (e) {
       var nav = e.target.closest('[data-hero-nav]');
       if (nav) { activate(cur + parseInt(nav.getAttribute('data-hero-nav'), 10)); play(); return; }
