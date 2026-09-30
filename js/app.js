@@ -84,6 +84,8 @@
     monitor: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M9 20h6M12 16v4"/>',
     play: '<circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l6-3.5z"/>',
     pause: '<circle cx="12" cy="12" r="9"/><path d="M9.5 8.5v7M14.5 8.5v7"/>',
+    minimize: '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M15 19l-3 3-3-3"/>',
+    maximize: '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M9 1l3 3 3-3"/>',
     rewind: '<path d="M11 8.5v7l-5-3.5z"/><path d="M18 8.5v7l-5-3.5z"/>',
     forward: '<path d="M13 8.5v7l5-3.5z"/><path d="M6 8.5v7l5-3.5z"/>',
     volume: '<path d="M11 5 6.5 9H3v6h3.5L11 19z"/><path d="M15 9a4.2 4.2 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/>',

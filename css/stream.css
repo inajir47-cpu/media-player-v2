@@ -261,3 +261,36 @@
   max-width: 180px; text-overflow: ellipsis;
 }
 .st-yt-select option { background: #1a1a1e; color: #fff; }
+
+/* floating draggable mini-player */
+.st-player.mini-mode {
+  inset: auto; top: auto; left: auto;
+  right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  width: min(260px, 62vw); aspect-ratio: 16 / 9;
+  background: transparent; overflow: visible;
+  display: block; padding: 0; z-index: 960;
+  touch-action: none; cursor: grab;
+  filter: drop-shadow(0 10px 28px rgba(0,0,0,.55));
+}
+.st-player.mini-mode:active { cursor: grabbing; }
+.st-player.mini-mode .st-yt-main { display: block; height: 100%; }
+.st-player.mini-mode .st-yt-video-wrap { height: 100%; border-radius: 12px; overflow: hidden; background: #000; position: relative; }
+.st-player.mini-mode .st-yt-info,
+.st-player.mini-mode .st-yt-reviews,
+.st-player.mini-mode .st-yt-side,
+.st-player.mini-mode .st-p-menu,
+.st-player.mini-mode .st-p-loading,
+.st-player.mini-mode .st-p-error { display: none; }
+.st-mini-bar {
+  display: none; position: absolute; left: 0; right: 0; bottom: 0;
+  align-items: center; gap: 8px; padding: 8px 10px;
+  background: linear-gradient(transparent, rgba(0,0,0,.78));
+  border-radius: 0 0 12px 12px;
+}
+.st-player.mini-mode .st-mini-bar { display: flex; }
+.st-mini-title { flex: 1; min-width: 0; color: #fff; font-size: 11px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-mini-btn { border: none; background: rgba(255,255,255,.14); color: #fff;
+  width: 30px; height: 30px; border-radius: 999px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.st-mini-btn .icon { width: 15px; height: 15px; }

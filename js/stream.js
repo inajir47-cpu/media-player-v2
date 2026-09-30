@@ -859,6 +859,50 @@
     }, { passive: true });
   }
 
+  // Mini-player: shrink the shell to a floating draggable box. The <video>
+  // element itself is never moved, so playback, HLS, audio tracks and
+  // subtitles keep running untouched.
+  function setMiniMode(el, on) {
+    el.classList.toggle('mini-mode', !!on);
+    var video = el.querySelector('.st-p-video');
+    video.controls = !on;                    // hide native controls in mini
+    video.style.pointerEvents = on ? 'none' : ''; // let drag work over video
+    if (!on) {                               // maximize: clear drag offsets
+      el.style.left = ''; el.style.top = '';
+      el.style.right = ''; el.style.bottom = '';
+    } else if (el._miniPos) {                // restore last drag position
+      el.style.left = el._miniPos.x + 'px'; el.style.top = el._miniPos.y + 'px';
+      el.style.right = 'auto'; el.style.bottom = 'auto';
+    }
+    var pp = el.querySelector('.st-mini-pp');
+    if (pp) pp.innerHTML = video.paused ? icon('play') : icon('pause');
+  }
+  // Touch + mouse drag for the mini-player. Ignored unless minimized, and
+  // never starts from a control (button/select/link).
+  function makeMiniDraggable(el) {
+    var pid = null, dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
+    el.addEventListener('pointerdown', function (e) {
+      if (!el.classList.contains('mini-mode')) return;
+      if (e.target.closest && e.target.closest('button,select,a,input')) return;
+      dragging = true; pid = e.pointerId;
+      var r = el.getBoundingClientRect();
+      sx = e.clientX; sy = e.clientY; ox = r.left; oy = r.top;
+      try { el.setPointerCapture(pid); } catch (err) {}
+      e.preventDefault();
+    });
+    el.addEventListener('pointermove', function (e) {
+      if (!dragging || e.pointerId !== pid) return;
+      var x = Math.max(0, Math.min(window.innerWidth - el.offsetWidth, ox + e.clientX - sx));
+      var y = Math.max(0, Math.min(window.innerHeight - el.offsetHeight, oy + e.clientY - sy));
+      el.style.left = x + 'px'; el.style.top = y + 'px';
+      el.style.right = 'auto'; el.style.bottom = 'auto';
+      el._miniPos = { x: x, y: y };
+    });
+    function end(e) { if (e.pointerId === pid) { dragging = false; pid = null; } }
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', end);
+  }
+
   function openPlayerShell(ctx, n, provName, lang) {
     closePlayer();
     var el = document.createElement('div');
@@ -882,6 +926,7 @@
               '<button class="st-p-btn st-yt-btn st-p-next" type="button" aria-label="Next episode">' + icon('arrowRight') + '</button>') +
             '<button class="st-p-btn st-yt-btn st-p-audio hidden" type="button" aria-label="Audio track">Audio</button>' +
             '<button class="st-p-btn st-yt-btn st-p-subs hidden" type="button" aria-label="Subtitles">Subs</button>' +
+            '<button class="st-p-btn st-yt-btn st-p-mini" type="button" aria-label="Minimize player">' + icon('minimize') + '</button>' +
             '<button class="st-p-btn st-yt-btn st-p-back" type="button" aria-label="Close player">' + icon('x') + '</button>' +
           '</div>' +
         '</div>' +
@@ -898,6 +943,26 @@
       '<div class="st-p-menu hidden"></div>';
     document.body.appendChild(el);
     el.querySelector('.st-p-back').addEventListener('click', closePlayer);
+    // floating mini-player bar: play/pause, maximize, close
+    var pVideo = el.querySelector('.st-p-video');
+    var miniBar = document.createElement('div');
+    miniBar.className = 'st-mini-bar';
+    miniBar.innerHTML =
+      '<button class="st-mini-btn st-mini-pp" type="button" aria-label="Play or pause"></button>' +
+      '<span class="st-mini-title">' + esc(ctx.title || '') + '</span>' +
+      '<button class="st-mini-btn st-mini-max" type="button" aria-label="Maximize player">' + icon('maximize') + '</button>' +
+      '<button class="st-mini-btn st-mini-x" type="button" aria-label="Close player">' + icon('x') + '</button>';
+    el.querySelector('.st-yt-video-wrap').appendChild(miniBar);
+    var ppBtn = miniBar.querySelector('.st-mini-pp');
+    function syncPp() { ppBtn.innerHTML = pVideo.paused ? icon('play') : icon('pause'); }
+    ppBtn.addEventListener('click', function () { if (pVideo.paused) pVideo.play(); else pVideo.pause(); });
+    pVideo.addEventListener('play', syncPp);
+    pVideo.addEventListener('pause', syncPp);
+    el.querySelector('.st-p-mini').addEventListener('click', function () { setMiniMode(el, true); });
+    miniBar.querySelector('.st-mini-max').addEventListener('click', function () { setMiniMode(el, false); });
+    miniBar.querySelector('.st-mini-x').addEventListener('click', closePlayer);
+    makeMiniDraggable(el);
+    syncPp();
     document.addEventListener('keydown', escClose);
     buildYtReviews(el);
     if (!ctx.isMovie) { buildYtEpisodes(el, ctx, n); buildYtCountdown(el); }
