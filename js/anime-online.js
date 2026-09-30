@@ -936,6 +936,7 @@
     var jobs = [];
     if (typeof window.nhSearch === 'function') jobs.push(window.nhSearch('hentai'));
     if (typeof window.htSearch === 'function') jobs.push(window.htSearch('hentai'));
+    if (typeof window.haSearch === 'function') jobs.push(window.haSearch('hentai'));
     Promise.all(jobs).then(function (lists) {
       state.loading = false;
       if (sentinel) sentinel.classList.remove('loading');
