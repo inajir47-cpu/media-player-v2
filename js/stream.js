@@ -336,8 +336,8 @@
 
   function wireDetail(mount, provider, id, d, mediaType) {
     var isManga = (d.mediaType || mediaType) === 'MANGA';
-    if (isManga) return;
     var prov = d.provider || provider;
+    if (isManga) { wireMangaWatchlist(mount, prov, id, d); return; }
     var anilistId = (prov === 'anilist' && d.id) ? parseInt(d.id, 10) : null;
     if (!Number.isFinite(anilistId)) anilistId = null;
     var ctx = { anilistId: anilistId, title: d.title || '', poster: d.image || '',
@@ -464,6 +464,51 @@
     var actions = copy.querySelector('.detail-actions');
     if (actions) actions.appendChild(saveBtn);
     else row.appendChild(saveBtn);
+    document.addEventListener('mpv2:history', refresh);
+    refresh();
+  }
+
+  /* Manga detail: the same Watchlist save button anime gets — bookmark
+   * icon, "Watchlist"/"Saved" label, unified "Watchlist" terminology so
+   * manga sits alongside anime in one list. No play button here; the
+   * smart Read/Continue button already covers that. */
+  function wireMangaWatchlist(mount, provider, id, d) {
+    var W = wh();
+    if (!W) return;
+    var actions = mount.querySelector('.detail-actions');
+    if (!actions || actions.querySelector('[data-manga-wl]')) return;
+    var anilistId = (provider === 'anilist' && d.id) ? parseInt(d.id, 10) : null;
+    if (!Number.isFinite(anilistId)) anilistId = null;
+    if (!anilistId && !d.title) return;
+    var key = W.keyFor({ anilistId: anilistId, title: d.title || '' });
+    var saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'wh-save';
+    saveBtn.setAttribute('data-manga-wl', '1');
+    function refresh() {
+      if (!document.contains(saveBtn)) {
+        document.removeEventListener('mpv2:history', refresh);
+        return;
+      }
+      var saved = W.isSaved(key);
+      saveBtn.classList.toggle('saved', saved);
+      saveBtn.innerHTML = icon('bookmark') +
+        '<span>' + (saved ? 'Saved' : 'Watchlist') + '</span>';
+      saveBtn.setAttribute('aria-pressed', String(saved));
+      saveBtn.setAttribute('aria-label', saved ? 'Remove from watchlist' : 'Add to watchlist');
+    }
+    saveBtn.addEventListener('click', function () {
+      var nowSaved = W.toggleWatchlist({
+        key: key, kind: 'manga',
+        title: d.title || '', poster: d.image || '', href: location.hash,
+        provider: provider, pid: String(id != null ? id : (d.id != null ? d.id : ''))
+      });
+      refresh();
+      if (window.MPV2 && typeof window.MPV2.toast === 'function') {
+        window.MPV2.toast(nowSaved ? 'Saved to watchlist' : 'Removed from watchlist');
+      }
+    });
+    actions.appendChild(saveBtn);
     document.addEventListener('mpv2:history', refresh);
     refresh();
   }

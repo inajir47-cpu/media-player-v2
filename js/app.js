@@ -331,7 +331,7 @@
               (it.poster ? '<img src="' + esc(it.poster) + '" alt="' + esc(it.title || '') + ' poster" loading="lazy">' : '') +
             '</span>' +
             '<span class="poster-title">' + esc(it.title || 'Untitled') + '</span>' +
-            '<span class="poster-meta">' + esc(it.kind === 'movie' ? 'Movie' : 'Series') + '</span></a>';
+            '<span class="poster-meta">' + esc(it.kind === 'movie' ? 'Movie' : (it.kind === 'manga' ? 'Manga' : 'Series')) + '</span></a>';
         }).join('') + '</div></section>';
     }
     return out;
