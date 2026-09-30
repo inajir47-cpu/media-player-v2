@@ -65,6 +65,29 @@
         .sort(function (a, b) { return chNum(a) - chNum(b); });
     });
   }
+  /* Per-chapter language availability for the chapter-card badges: which
+   * chapter numbers exist in the EN / JA MangaDex feeds. In-memory cached
+   * per uuid for the session. */
+  var langAvailCache = {};
+  function langAvailability(uuid) {
+    if (langAvailCache[uuid]) return Promise.resolve(langAvailCache[uuid]);
+    return Promise.all([feedSorted(uuid, 'en'), feedSorted(uuid, 'ja')]).then(function (feeds) {
+      function numSet(sorted) {
+        var s = {};
+        (sorted || []).forEach(function (c) { s[String(c.ch)] = 1; });
+        return s;
+      }
+      var out = { en: numSet(feeds[0]), ja: numSet(feeds[1]) };
+      langAvailCache[uuid] = out;
+      return out;
+    });
+  }
+  function langAvailabilityFor(ctx) {
+    return resolveUuid(ctx).then(function (uuid) {
+      if (!uuid) return { en: {}, ja: {} };
+      return langAvailability(uuid);
+    });
+  }
   function idxOf(sorted, entry) {
     for (var i = 0; i < sorted.length; i++) {
       if (sorted[i].id === entry.id) return i;
@@ -241,6 +264,7 @@
     setProvider: setProvider,
     openSourceDialog: openSourceDialog,
     openChapter: openChapter,
+    langAvailabilityFor: langAvailabilityFor,
     closeDialog: closeDialog
   };
 })();

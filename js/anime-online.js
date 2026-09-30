@@ -1734,6 +1734,48 @@
       refreshChStates();
     }
     document.addEventListener('mpv2:history', onHistory);
+    // Manga chapter badges: EN/JA language pills + per-card globe, mirroring
+    // the anime episode cards (.st-badges / .st-globe from stream.css).
+    // Availability comes from the MangaDex EN/JA feeds; cards already on
+    // screen are painted when the feeds arrive, later pages on insertion.
+    function paintChBadges() {
+      var MS = window.MPV2 && window.MPV2.MangaSource;
+      if (!isCh || !MS || typeof MS.langAvailabilityFor !== 'function') return;
+      var fresh = [];
+      strip.querySelectorAll('.episode-card[data-ch-n]:not([data-ch-badged])').forEach(function (card) {
+        card.setAttribute('data-ch-badged', '1');
+        fresh.push(card);
+      });
+      if (!fresh.length) return;
+      MS.langAvailabilityFor({ title: d.title, malId: d.malId || null }).then(function (av) {
+        if (!av) return;
+        fresh.forEach(function (card) {
+          if (!card.isConnected) return;
+          var n = card.getAttribute('data-ch-n');
+          var tags = '';
+          if (av.en[n]) tags += '<i class="st-b st-sub">EN</i>';
+          if (av.ja[n]) tags += '<i class="st-b st-dub">JA</i>';
+          if (!tags) return; // not available for reading -> no badges, no globe
+          var badges = document.createElement('span');
+          badges.className = 'st-badges';
+          badges.innerHTML = tags;
+          card.appendChild(badges);
+          var actions = card.querySelector('.episode-actions');
+          if (actions && !actions.querySelector('.st-globe')) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'episode-action st-globe';
+            btn.setAttribute('aria-label', 'Choose source for chapter ' + n);
+            btn.innerHTML = icon('globe');
+            btn.addEventListener('click', function (ev) {
+              ev.stopPropagation();
+              MS.openSourceDialog({ title: d.title, malId: d.malId || null, image: d.image || '' });
+            });
+            actions.insertBefore(btn, actions.firstChild);
+          }
+        });
+      }).catch(function () {});
+    }
     // Movie block: single static row, already in the HTML — no pagination.
     if (block.hasAttribute('data-ep-movie')) { block.hidden = false; return; }
     var strip = block.querySelector('[data-' + kind + '-grid]');
@@ -1856,6 +1898,7 @@
         strip.insertAdjacentHTML('beforeend', r.items.map(function (it) {
           return epCardHtml(provider, id, it, isCh, d.image, hkey, chProgMap);
         }).join(''));
+        if (isCh) paintChBadges();
         hasMore = !!r.hasMore;
         maybeLoadMore();
         if (jumping != null) jumpTo(jumping, jumpingSilent);
