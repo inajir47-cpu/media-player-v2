@@ -91,6 +91,23 @@ Obey this on every update. Updated 2026-09-30.
    plan only if usage is sustained.
 8. **Episode stills missing**: Imran hasn't added his TMDB key in Settings yet — remind him.
    The key cannot be created for him.
+9. **Adult (18+) toggle leaks a title**: fixed 2026-09-30 (commit `05613a6`).
+   Two causes: (a) the 48h detail cache could serve entries saved *before* the
+   adult pack — they have no `isAdult` field, so the gate was skipped. The
+   cache key is now versioned (`d:v2:…`); old entries are never reused, details
+   refetch once. (b) `isAdult` filtering now covers every list surface (TOP 010,
+   Discover/genre, home recommendations, detail recommendations, hero), not
+   just search. Also: home "Recently Watched" cards have the X remove button
+   (same instant-remove + live refresh + toast as the History tab).
+10. **18+ badges + Recently Viewed remove**: 2026-09-30 (uncommitted at write
+    time). `recordView()` now persists `isAdult`, so Recently Viewed /
+    Recently Viewed Manga cards render the 18+ badge (moved top-left; the X
+    sits top-right). TOP 010 rows and hero slides also badge adult titles when
+    the opt-in is ON. Home "Recently Viewed" and Manga-tab "Recently Viewed
+    Manga" cards have the X remove button: instant storage removal + card
+    removal (section hides when empty) + toast, never navigates. Bug caught in
+    testing: the section must be captured *before* `card.remove()` detaches the
+    button from the DOM, otherwise `closest('section')` returns null.
 
 ## Standing rules — obey on every update
 

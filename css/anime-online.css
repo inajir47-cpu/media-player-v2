@@ -867,6 +867,13 @@ button.trailer-btn { cursor: pointer; font-family: inherit; }
   -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 .adult18.on-poster { position: absolute; top: 8px; right: 8px; z-index: 2; }
 .adult18.big { min-width: 58px; height: 32px; font-size: 15px; }
+/* 18+ badge on hero slides. */
+.hero-badge.adult {
+  background: rgba(255,60,60,.22); border-color: rgba(255,90,90,.95); color: #ffb3b3;
+}
+/* Recently Viewed cards: the X sits top-right, so the 18+ badge moves top-left. */
+#recentlyViewedBlock .adult18.on-poster,
+#recentlyViewedMangaBlock .adult18.on-poster { right: auto; left: 8px; }
 /* 18+ gate shown instead of the detail page until the user opts in. */
 .adult-gate { text-align: center; padding: 56px 24px; }
 .adult-gate h2 { margin: 14px 0 8px; }

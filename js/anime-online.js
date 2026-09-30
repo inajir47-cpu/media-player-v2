@@ -322,7 +322,7 @@
     var key = provider + ':' + id;
     var entry = {
       provider: provider, id: id, title: d.title, image: d.image || '',
-      mediaType: mt, format: d.format || '',
+      mediaType: mt, format: d.format || '', isAdult: !!d.isAdult,
       href: '#/' + SEC_ID + '/online/' + provider + '/' + (isManga ? 'manga/' : '') + id,
       viewedAt: Date.now()
     };
@@ -350,9 +350,12 @@
     var list = getRecentlyViewed();
     if (!list.length) return '';
     var cards = list.map(function (v) {
+      var key = v.provider + ':' + v.id;
+      var badge = v.isAdult ? '<span class="adult18 on-poster">18+</span>' : '';
       return '<a class="poster-card online-card" href="' + esc(v.href) + '">' +
         '<span class="poster-img"><img src="' + esc(v.image) + '" alt="' + esc(v.title) +
-        ' poster" loading="lazy"></span>' +
+        ' poster" loading="lazy">' + badge +
+        '<button class="rw-remove" data-rv-remove="' + esc(key) + '" aria-label="Remove from recently viewed">' + icon('x') + '</button></span>' +
         '<span class="poster-title">' + esc(v.title) + '</span></a>';
     }).join('');
     return '<section class="online-block" id="recentlyViewedBlock"><div class="online-head">' +
@@ -366,9 +369,12 @@
     var list = getRecentlyViewed(true);
     if (!list.length) return '';
     var cards = list.map(function (v) {
+      var key = v.provider + ':' + v.id;
+      var badge = v.isAdult ? '<span class="adult18 on-poster">18+</span>' : '';
       return '<a class="poster-card online-card" href="' + esc(v.href) + '">' +
         '<span class="poster-img"><img src="' + esc(v.image) + '" alt="' + esc(v.title) +
-        ' poster" loading="lazy"></span>' +
+        ' poster" loading="lazy">' + badge +
+        '<button class="rw-remove" data-rv-remove="' + esc(key) + '" data-rv-manga="1" aria-label="Remove from recently viewed">' + icon('x') + '</button></span>' +
         '<span class="poster-title">' + esc(v.title) + '</span></a>';
     }).join('');
     return '<section class="online-block" id="recentlyViewedMangaBlock"><div class="online-head">' +
@@ -478,6 +484,7 @@
   function heroBadges(s) {
     var it = s.item, b = [];
     b.push('<span class="hero-badge kind">' + esc(heroKindLabel(it)) + '</span>');
+    if (it.isAdult) b.push('<span class="hero-badge adult">18+</span>');
     if (heroIsOnAir(it)) b.push('<span class="hero-badge onair"><i></i>ON AIR</span>');
     if (heroIsNew(it)) b.push('<span class="hero-badge new">NEW</span>');
     return b.join('');
@@ -738,7 +745,8 @@
     return '<a class="top10-row" href="' + detailPath(item) + '">' +
       '<span class="rank">' + n + '</span>' +
       '<span class="thumb"><img src="' + esc(item.image) + '" alt="" loading="lazy"></span>' +
-      '<span class="copy"><b><span class="t">' + esc(item.title) + '</span>' + scoreBadge(item) + '</b>' +
+      '<span class="copy"><b><span class="t">' + esc(item.title) + '</span>' + scoreBadge(item) +
+      (item.isAdult ? '<span class="adult18">18+</span>' : '') + '</b>' +
       '<small>' + esc(sub) + '</small></span>' + opScreen +
       '<span class="go">' + icon('chevron') + '</span></a>';
   }
@@ -999,6 +1007,24 @@
 
   function wireDiscover(sec, root) {
     root.addEventListener('click', function (e) {
+      // Recently Viewed X (anime + manga rows): instant remove, never navigates.
+      var rvx = e.target.closest('[data-rv-remove]');
+      if (rvx) {
+        e.preventDefault(); e.stopPropagation();
+        var rkey = rvx.getAttribute('data-rv-remove');
+        var isManga = !!rvx.getAttribute('data-rv-manga');
+        var kept = getRecentlyViewed(isManga).filter(function (x) {
+          return x && (x.provider + ':' + x.id) !== rkey;
+        });
+        try { localStorage.setItem(isManga ? LS_RECENT_VIEWED_MANGA : LS_RECENT_VIEWED, JSON.stringify(kept)); } catch (err) {}
+        var card = rvx.closest('.poster-card');
+        // NB: capture the section BEFORE card.remove() detaches the button.
+        var blk = card ? card.closest('section') : null;
+        if (card) card.remove();
+        if (blk && !blk.querySelector('.poster-card')) blk.remove();
+        if (window.MPV2.toast) window.MPV2.toast('Removed from recently viewed');
+        return;
+      }
       var r = e.target.closest('[data-range]');
       if (r) {
         state.range = r.getAttribute('data-range');
