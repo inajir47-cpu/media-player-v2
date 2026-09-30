@@ -71,7 +71,10 @@
 .rw-card.is-adult:hover .rw-poster img,
 .rw-card.is-adult.revealed .rw-poster img,
 .poster-card.is-adult:hover .poster-img img,
-.poster-card.is-adult.revealed .poster-img img{filter:none}.hfolder{position:relative; display:block; width:148px; max-width:40vw; aspect-ratio:2/3;
+.poster-card.is-adult.revealed .poster-img img{filter:none}
+/* 18+ blur master toggle (search page): OFF shows posters plainly. */
+body.adult-blur-off .rw-card.is-adult .rw-poster img,
+body.adult-blur-off .poster-card.is-adult .poster-img img{filter:none}.hfolder{position:relative; display:block; width:148px; max-width:40vw; aspect-ratio:2/3;
   border-radius:14px; overflow:hidden; background:#0b0b0d;
   border:1px solid var(--line, rgba(255,255,255,.08))}
 .hfolder-poster{position:absolute; inset:0; display:block}

@@ -418,6 +418,7 @@
       var t = e.target;
       if (!t || !t.closest) return;
       if (t.closest('[data-rw-remove],[data-rv-remove],[data-rw-play]')) return;
+      if (window.MPV2.getAdultBlur && !window.MPV2.getAdultBlur()) return; // blur off: open directly
       var link = t.closest('[data-adult-gate]');
       if (!link) return;
       var card = link.closest('.is-adult');
@@ -2033,6 +2034,26 @@
             renderSearchResults();
           });
         }
+        // 18+ blur master toggle: sits right after the filter chips row.
+        var sfRow2 = root.querySelector('#searchFilters');
+        if (window.MPV2.blurToggleHtml && sfRow2 && !root.querySelector('#blurToggle'))
+          sfRow2.insertAdjacentHTML('afterend', window.MPV2.blurToggleHtml());
+        var blurT = root.querySelector('#blurToggle');
+        if (blurT) {
+          var bOn = !window.MPV2.getAdultBlur || window.MPV2.getAdultBlur();
+          blurT.classList.toggle('on', bOn);
+          blurT.setAttribute('aria-pressed', bOn ? 'true' : 'false');
+          if (!blurT.getAttribute('data-wired') && window.MPV2.setAdultBlur) {
+            blurT.setAttribute('data-wired', '1');
+            blurT.addEventListener('click', function () {
+              var on = window.MPV2.setAdultBlur(!window.MPV2.getAdultBlur());
+              blurT.classList.toggle('on', on);
+              blurT.setAttribute('aria-pressed', on ? 'true' : 'false');
+              var sub = blurT.parentNode ? blurT.parentNode.querySelector('.god-sub') : null;
+              if (sub) sub.textContent = on ? '18+ posters stay blurred.' : '18+ posters shown plainly.';
+            });
+          }
+        }
         } catch (err) { /* search enhancements are best-effort on first paint */ }
       }
       wireSearchEnhancements();
@@ -2428,6 +2449,9 @@
       else if (r.view === 'onlinecharacter') { window.MPV2.renderOnlineCharacter(r.section, r.provider, r.id, r.name); }
       else { renderShell(sec, r.tab, r.sub); }
     }
+    // 18+ blur toggle: leaving the search tab auto-resets it to ON.
+    if (window.MPV2.setAdultBlur && !(r.section === 'animation' && r.tab === 'search'))
+      window.MPV2.setAdultBlur(true);
     // STEP 7 · CHUNK 1: consume any pending motion arrival.
     if (motion.pending) { runMotionArrival(); }
     wirePosterPreviews(); // STEP 7 · CHUNK 5: hover ambient previews

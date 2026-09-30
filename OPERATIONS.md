@@ -831,3 +831,25 @@ Obey this on every update. Updated 2026-09-30.
   location.hash directly, so a bubble-phase gate can never win — capture
   phase + stopPropagation is required. Committed locally, NOT pushed,
   NOT phone-tested.
+
+## 50. 2026-10-01 — 18+ Blur master toggle on the search page
+- Request: a toggle next to the filter chips on search, default ON; ON =
+  all 18+ content blurred (entry 49 behavior); OFF = posters shown
+  plainly; leaving the search page for any other tab auto-resets it to ON.
+- js/anime-online.js: module-level `adultBlur` flag (default true) with
+  getAdultBlur()/setAdultBlur() (setAdultBlur toggles
+  body.adult-blur-off); blurToggleHtml() renders a God-Mode-style toggle
+  (id blurToggle, label "18+ Blur"); all three exported on window.MPV2.
+- js/app.js: wireSearchEnhancements() injects the toggle right after the
+  #searchFilters row, wires it (syncs on-state on every call so a
+  re-render never shows a stale switch), render() auto-resets the flag
+  to ON whenever the route is not the animation search tab, and
+  adultGate() bails out when the flag is off so taps open info pages
+  directly. Ctrl/meta-click bypasses the gate like the motion router.
+- css/pages.css: body.adult-blur-off clears the blur filter on adult
+  posters (higher specificity, wins over :hover/.revealed rules).
+- Verified real Chromium 14/14: toggle present + ON by default, OFF
+  flips flag/body class/sub text, leaving search auto-resets ON (flag +
+  body class + switch UI on return), OFF unblurs posters and taps open
+  directly. Regression: entry-49 suite still 21/21. Committed locally,
+  NOT pushed, NOT phone-tested.

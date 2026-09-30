@@ -1215,6 +1215,25 @@
         : 'Search provider servers directly, bypassing meta-APIs.') + '</p></div>';
   }
 
+  /* 18+ blur master toggle (search page). Default ON; app.js render()
+   * auto-resets it to ON when leaving the search tab. */
+  var adultBlur = true;
+  function getAdultBlur() { return adultBlur; }
+  function setAdultBlur(on) {
+    adultBlur = (on !== false);
+    try { document.body.classList.toggle('adult-blur-off', !adultBlur); } catch (e) {}
+    return adultBlur;
+  }
+  function blurToggleHtml() {
+    return '<div class="god-row"><button type="button" id="blurToggle" class="god-toggle' +
+      (adultBlur ? ' on' : '') + '" aria-pressed="' + adultBlur + '" aria-label="Toggle 18+ poster blur">' +
+      '<span class="god-bolt">🔞</span><span class="god-label">18+ Blur</span>' +
+      '<span class="god-switch"><span class="god-knob"></span></span></button>' +
+      '<p class="god-sub">' + (adultBlur
+        ? '18+ posters stay blurred.'
+        : '18+ posters shown plainly.') + '</p></div>';
+  }
+
   window.MPV2.searchResultsHtml = searchResultsHtml;
   window.MPV2.searchFilterChipsHtml = searchFilterChipsHtml;
   window.MPV2.getSearchFilter = getSearchFilter;
@@ -1487,6 +1506,9 @@
   window.MPV2.getGodMode = getGodMode;
   window.MPV2.setGodMode = setGodMode;
   window.MPV2.godToggleHtml = godToggleHtml;
+  window.MPV2.getAdultBlur = getAdultBlur;
+  window.MPV2.setAdultBlur = setAdultBlur;
+  window.MPV2.blurToggleHtml = blurToggleHtml;
   window.MPV2.godResultsHtml = godResultsHtml;
   window.MPV2.openGodCard = openGodCard;
   window.MPV2.onlineSkeletons = skeletonCards;
