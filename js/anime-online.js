@@ -119,7 +119,7 @@
 
   /* ------------------------- character popup ----------------------------- */
 
-  function characterPopupHtml(c) {
+  function characterPopupHtml(c, role) {
     var anime = (c.anime || []).length
       ? '<h4 class="rv-sec">Appears in</h4><div class="ch-pop-grid">' +
         c.anime.map(function (a) {
@@ -141,17 +141,19 @@
     return '<header class="ch-pop-hero"><span class="poster-img big"><img src="' + esc(c.image) +
       '" alt="' + esc(c.name) + '"></span>' +
       '<div class="detail-copy"><h1 class="ch-pop-name">' + esc(c.name) + '</h1>' +
+      (role ? '<span class="ch-role-tag ' + (role === 'Main' ? 'is-main' : 'is-side') + '">' +
+        esc(role === 'Main' ? 'Main character' : 'Supporting character') + '</span>' : '') +
       (c.native ? '<p class="detail-meta dim">' + esc(c.native) + '</p>' : '') +
       charFacts(c) + '</div></header>' +
       '<h4 class="rv-sec">About</h4>' + charDescription(c) + anime + vas;
   }
 
-  function openCharacterPopup(provider, id, name) {
+  function openCharacterPopup(provider, id, name, role) {
     var scrim = openPopup(name || 'Character', providerName(),
       '<div class="rv-loading"><span class="spin"></span>Loading…</div>');
     var body = scrim.querySelector('.rv-body');
     API().characterDetail(provider, id, name).then(function (c) {
-      if (body && body.isConnected) body.innerHTML = characterPopupHtml(c);
+      if (body && body.isConnected) body.innerHTML = characterPopupHtml(c, role);
     }).catch(function () {
       if (body && body.isConnected) body.innerHTML = '<p class="rv-empty">Could not load character info.</p>';
     });
@@ -957,15 +959,18 @@
           '" data-va-name="' + esc(c.va.name) + '" data-va-src="anilist"' +
           ' tabindex="0" role="link" aria-label="' + esc(c.va.name) + ' profile"' : '') + '>'
       : '<span class="cast-card-arrow">' + icon('chevron') + '</span>';
+    var roleTag = c.role
+      ? '<span class="cast-role-tag ' + (c.role === 'Main' ? 'is-main' : 'is-side') + '">' +
+        esc(c.role === 'Main' ? 'Main' : 'Side') + '</span>' : '';
     var link = c.id && provider
       ? ' data-char-provider="' + esc(provider) + '" data-char-id="' + esc(String(c.id)) +
-        '" data-char-name="' + esc(c.name || '') +
+        '" data-char-name="' + esc(c.name || '') + '" data-char-role="' + esc(c.role || '') +
         '" tabindex="0" role="link" aria-label="' + esc(c.name) + ' details"'
       : '';
     return '<div class="cast-card online-cast' + (link ? ' is-link' : '') + '"' + link +
       '><img class="cast-card-photo" src="' + esc(c.image) +
       '" alt="' + esc(c.name) + '" loading="lazy">' +
-      '<div class="cast-card-copy"><strong>' + esc(c.name) + '</strong>' + vaLine + '</div>' +
+      '<div class="cast-card-copy"><strong>' + esc(c.name) + '</strong>' + vaLine + roleTag + '</div>' +
       vaPhoto + '</div>';
   }
 
@@ -1741,7 +1746,8 @@
       // Character info opens in a popup, not a full page. Details are
       // prefetched when the title page loads, so this opens instantly.
       openCharacterPopup(card.getAttribute('data-char-provider') || lastDetailProvider,
-        card.getAttribute('data-char-id'), card.getAttribute('data-char-name') || '');
+        card.getAttribute('data-char-id'), card.getAttribute('data-char-name') || '',
+        card.getAttribute('data-char-role') || '');
       return;
     }
     if (e.target.closest('[data-go-back]')) {

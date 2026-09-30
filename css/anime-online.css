@@ -312,6 +312,21 @@ button.trailer-btn { cursor: pointer; font-family: inherit; }
 .va-facts { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .va-facts li { font-size: 11px; color: var(--muted); background: rgba(127,127,127,.12);
   border-radius: 999px; padding: 3px 10px; }
+/* Character role tags: Main (gold) vs Side (indigo). Card badge is mobile-only;
+   popup badge is always visible and prominent. */
+.cast-card-copy .cast-role-tag { display: none; }
+.ch-role-tag { display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: .1em;
+  text-transform: uppercase; padding: 4px 12px; border-radius: 999px; margin: 6px 0 4px; }
+.ch-role-tag.is-main, .cast-card-copy .cast-role-tag.is-main { color: #ffd76a;
+  background: rgba(255,215,106,.14); border: 1px solid rgba(255,215,106,.4); }
+.ch-role-tag.is-side, .cast-card-copy .cast-role-tag.is-side { color: #a5b4fc;
+  background: rgba(165,180,252,.12); border: 1px solid rgba(165,180,252,.35); }
+:root[data-theme="light"] .ch-role-tag.is-main,
+:root[data-theme="light"] .cast-card-copy .cast-role-tag.is-main { color: #9a6b00;
+  background: rgba(255,180,0,.14); border-color: rgba(255,180,0,.4); }
+@media (max-width: 560px) {
+  .cast-card-copy .cast-role-tag { display: inline-block; font-size: 10px; padding: 2px 8px; margin-top: 6px; }
+}
 
 /* settings: provider note */
 .provider-note { font-size: 12.5px; color: var(--muted, #8e8e93); line-height: 1.55; margin: 10px 0 0; }
