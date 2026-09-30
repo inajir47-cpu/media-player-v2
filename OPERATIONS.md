@@ -199,6 +199,21 @@ Obey this on every update. Updated 2026-09-30.
     `v2-provider-dialog.png`). Local commit, NOT pushed (needs fresh PAT).
     Phone test pending — only Imran's device counts.
 
+16. **2026-09-30 — God Mode search parsing fixes (Reanime + Hindi-2).**
+    Imran's screenshot showed Reanime cards rendering raw `[object Object]` /
+    `[object Object] poster`, and Hindi-2 titles ending in junk
+    `Download HD` (the card template appends `" poster"` to the alt, which is
+    where the full `Download HD poster` came from). Fixes, normalization-only:
+    `js/stream.js` — new `reStr()` helper unwraps nested title/poster objects
+    (`{english/romaji/title/name}`, `{large/medium/small/url/src}`, else
+    first string prop) so `searchReanime` always emits plain strings; dub
+    detection now tests the extracted title. `js/codedew-hindi-provider.js`
+    (`cdSearch`) — scraped titles are sanitized with
+    `.replace(/\s+download(\s+hd)?\s*$/i,'')` so `... Episodes Download HD`
+    becomes `... Episodes`; clean titles untouched. No routing/playback logic
+    changed. Verified: real Chromium 15/15 against canned nested payloads.
+    Local commit, NOT pushed (needs fresh PAT). Phone test pending.
+
 ## Standing rules — obey on every update
 
 - Build strictly part-by-part; surgical changes only; **diagnose the exact cause before rebuilding**.

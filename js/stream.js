@@ -1465,6 +1465,21 @@
   }
 
   /* ---------- public ---------- */
+  /* Unwrap a value that may be a string or a nested object ({english},
+     {romaji}, {large}...) into a plain string. Never returns an object,
+     so templates can't render "[object Object]". */
+  function reStr(v) {
+    if (typeof v === 'string') return v;
+    if (v && typeof v === 'object') {
+      var keys = ['english', 'romaji', 'title', 'name',
+                  'large', 'medium', 'small', 'url', 'src'];
+      for (var i = 0; i < keys.length; i++)
+        if (typeof v[keys[i]] === 'string' && v[keys[i]]) return v[keys[i]];
+      for (var k in v)
+        if (typeof v[k] === 'string' && v[k]) return v[k];
+    }
+    return '';
+  }
   window.MPV2.Stream = {
     wireDetail: wireDetail,
     checkEpisode: function (ctx, n) { return checkEpisodeStaged(ctx, n, function () {}); },
@@ -1478,10 +1493,12 @@
       return wGetJSON(REANIME + '/api/v1/search?q=' + encodeURIComponent(q) + '&limit=12')
         .then(function (d) {
           return (d.results || []).map(function (r) {
-            if (!r || !(r.title || r.name)) return null;
-            var dub = r.has_dub || r.hasDub || /dub/i.test(r.title || '');
+            if (!r) return null;
+            var title = reStr(r.title) || reStr(r.name);
+            if (!title) return null;
+            var dub = r.has_dub || r.hasDub || /dub/i.test(title);
             return {
-              title: r.title || r.name, image: r.poster || r.image || r.cover || '',
+              title: title, image: reStr(r.poster) || reStr(r.image) || reStr(r.cover),
               type: (r.type === 'movie' || /movie/i.test(r.format || '')) ? 'movie' : 'series',
               server: 'Reanime', langs: ['English'],
               audio: dub ? ['Sub', 'Dub'] : ['Sub'],

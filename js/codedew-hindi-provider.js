@@ -126,6 +126,8 @@ function cdSearch(q) {
         var h = a.closest('h2, h3');
         if (h) title = h.textContent.trim();
       }
+      // Strip site junk suffixes ("... Episodes Download HD") so cards read cleanly.
+      title = title.replace(/\s+download(\s+hd)?\s*$/i, '').replace(/\s{2,}/g, ' ').trim();
       if (!title || title.length < 3) return;
       // Mark seen only once we have a usable title: the post-thumbnail
       // anchor (empty text) appears before the <h2> anchor with the same
