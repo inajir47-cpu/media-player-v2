@@ -853,3 +853,13 @@ Obey this on every update. Updated 2026-09-30.
   body class + switch UI on return), OFF unblurs posters and taps open
   directly. Regression: entry-49 suite still 21/21. Committed locally,
   NOT pushed, NOT phone-tested.
+
+## 51. 2026-10-01 — Pushed 6 local commits to GitHub (Render redeployed)
+- Pushed ba2858a..93d78a2 to origin/main with Imran's fresh PAT (used
+  transiently via Basic auth, then discarded — never stored). Commits:
+  genre scroll/details ops note, hanime Episodes row, hanime clickable
+  tags strip, private hentai folders + hanime Watchlist button, 18+
+  poster blur with 5s tap-to-reveal, 18+ Blur master toggle.
+- Render auto-redeployed: live js/app.js contains adultGate, live
+  js/anime-online.js contains blurToggleHtml, live css/pages.css
+  contains adult-blur-off. NOT phone-tested — only Imran's device counts.
