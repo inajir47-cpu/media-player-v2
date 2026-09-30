@@ -474,6 +474,21 @@ Obey this on every update. Updated 2026-09-30.
     page-2 tail fill without dupes, empty-page fallback, unknown total
     untouched, gappy provider). Chapters use a different pattern (no synth
     fallback) — left alone. NOT phone-tested — only Imran's device counts.
+28. 2026-09-30 — Live countdown timers for unreleased episodes: VERIFIED
+    ALREADY SHIPPED, no code change. Imran requested the feature; inspection
+    showed it fully built: `epCardHtml()` detects future episodes
+    (`it.ts > Date.now()`), paints a SOON badge + boxed DAYS/HRS/MIN/SEC
+    countdown (`cdBoxesHtml(it.ts, true)`), a single global 1-second ticker
+    (`ensureCountdownTicker()`, started on detail render) updates every
+    `[data-cd-boxes]` in the document (late-paginated cards included), and
+    stream.js only paints playback badges/globe when a staged source exists
+    (unaired cards get none). Verified end-to-end in real Chromium against
+    the shipped page with seeded cache (3-episode detail, ep 3 airing in
+    2d 3h 4m): 3 cards rendered, ep 3 showed SOON + 02/03/03/51 countdown
+    matching the seeded timestamp, aired eps showed normal dates, no globe
+    on the unaired card, SEC ticked 53->50 over 2.6s (ticker live).
+    Screenshots: countdown-strip.png, countdown-ep3.png. NOT phone-tested
+    — only Imran's device counts.
 
 ## Standing rules — obey on every update
 
