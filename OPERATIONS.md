@@ -214,6 +214,34 @@ Obey this on every update. Updated 2026-09-30.
     changed. Verified: real Chromium 15/15 against canned nested payloads.
     Local commit, NOT pushed (needs fresh PAT). Phone test pending.
 
+17. 2026-09-30 — God Mode final routing/history/theme update (Imran approved
+    exact diffs, then confirmed apply). `js/anime-online.js`:
+    - God Mode cards no longer auto-play or directly open a reader.
+    - MangaDex tap: removed the auto-first-chapter open; new
+      `openGodChapterPicker()` shows the EN chapter feed in a popup and the
+      reader opens only on the chapter the user picks.
+    - Hindi tap: `Stream.playEpisode({title}, 1)` runs availability checks and
+      opens the standard provider/server selection dialog (manual choice).
+    - Reanime with AniList ID routes to the standard detail page; without ID
+      falls back to the provider dialog. nhentai/Hitomi keep the 18+ warning
+      gate and open the reader only on Proceed.
+    - New `godRecordView(card, kind)`: every tap instantly calls `recordView()`
+      for Recently Viewed. Adult galleries log only on 18+ Proceed (cancelled
+      warning leaves no trace — same rule as standard detail). Manga/adult
+      entries go to the manga Recently Viewed store.
+    - Recently Viewed hrefs: real detail route where one exists (reanime +
+      AniList ID); otherwise the search view `#/animation/search` (never a
+      dead link). `recordView()` now accepts a supplied `d.href` override.
+    - Hindi cards carry `data-god-slug`; MangaDex cards carry
+      `data-god-title`; Reanime cards already carried title/AniList ID.
+    - Only the provider-selection and external-link warning popup colors were
+      touched (earlier commit); the chapter picker is styled to the OLED
+      theme (`#101014`/`#232326`); the 0.6s poster tint transition is untouched.
+    Verified: real Chromium 15/15 (dialog opens, no autoplay, picker lists
+    chapters in order, reader NOT auto-opened, chapter pick opens reader,
+    detail route, all three kinds logged with correct hrefs). Local commit
+    6e34b9c, NOT pushed (needs fresh PAT). Phone test pending.
+
 ## Standing rules — obey on every update
 
 - Build strictly part-by-part; surgical changes only; **diagnose the exact cause before rebuilding**.
