@@ -489,6 +489,29 @@ Obey this on every update. Updated 2026-09-30.
     on the unaired card, SEC ticked 53->50 over 2.6s (ticker live).
     Screenshots: countdown-strip.png, countdown-ep3.png. NOT phone-tested
     — only Imran's device counts.
+29. 2026-09-30 — Cross-media routing for Adaptation cards in the Related
+    section: FIXED. Clicking an Adaptation relation that points to a Light
+    Novel or One-Shot showed the retry/error screen. Root cause: the Related
+    card render (`js/anime-online.js`) classified only `r.format === 'MANGA'`
+    as manga-type, but AniList's manga-type media comes in three formats —
+    `MANGA`, `NOVEL`, `ONE_SHOT` (all `type: MANGA`). Novels/one-shots fell
+    through to the anime route, so the anime detail loader ran
+    `Media(id, type: ANIME)` on a novel ID → AniList returned `Media: null`
+    → `alItem(null)` threw on `m.id` → the detail `.catch` rendered the
+    error screen. (Pure MANGA adaptations already routed correctly and were
+    never broken.) Fix: one-line classifier —
+    `r.format === 'MANGA' || r.format === 'NOVEL' || r.format === 'ONE_SHOT'`
+    → novel/one-shot cards now route through `#/.../manga/<id>` into
+    `renderOnlineDetail(..., 'MANGA')` → `anilistDetail(id, 'MANGA')` finds
+    them. The router's manga branch already precedes the anime branch; the
+    Recommendations strip already classifies by `mediaType` (unaffected);
+    Jikan relations are anime-only upstream (nothing to fix there). Verified
+    in real Chromium against the shipped page with seeded cache: before —
+    novel card href `#/animation/online/anilist/333` → error screen; after —
+    novel href `#/animation/online/anilist/manga/333` and one-shot href
+    `#/animation/online/anilist/manga/444`, clicking the novel card rendered
+    the novel detail with no error. NOT phone-tested — only Imran's device
+    counts.
 
 ## Standing rules — obey on every update
 

@@ -1972,7 +1972,9 @@
     var rel = (d.relations || []).length
       ? '<section class="online-block"><h2>Related</h2><div class="rel-strip">' +
         d.relations.map(function (r) {
-          var rManga = r.format === 'MANGA';
+          // AniList manga-type formats (all type:MANGA on the API):
+          // MANGA, NOVEL, ONE_SHOT. Anything else keeps the anime route.
+          var rManga = r.format === 'MANGA' || r.format === 'NOVEL' || r.format === 'ONE_SHOT';
           return '<a class="poster-card" href="#/' + SEC_ID + '/online/' + d.provider + '/' +
             (rManga ? 'manga/' : '') + encodeURIComponent(r.id) + '"><span class="poster-img"><img src="' +
             esc(r.image) + '" alt="' + esc(r.title) + '" loading="lazy">' + posterScore(r) +
