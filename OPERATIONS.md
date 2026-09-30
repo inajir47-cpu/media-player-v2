@@ -559,3 +559,20 @@ Obey this on every update. Updated 2026-09-30.
 - No unapproved providers, no fake provider buttons, no unrelated upgrades without explicit approval.
 - Preserve OLED styling, liquid-display effects, chameleon behavior, categorized Settings,
   and localStorage persistence.
+32. 2026-09-30 — Instant dynamic theme color (chameleon tint perf fix). The
+    canvas was already 24x24 (pixel work = microseconds); the real delay was a
+    SECOND full poster download+decode (`new Image()` with CORS can't reuse the
+    non-CORS display `<img>` cache entry) with `--tone` unset until its onload.
+    Rewrote `tintFromPoster()` in `js/anime-online.js`: (a) synchronous instant
+    tone — localStorage cache hit (`mpv2:tone:v1`, cap 200) or deterministic
+    title-hash HSL fallback, applied before first paint; (b) extraction now
+    runs in `requestIdleCallback` (setTimeout fallback) with `decoding='async'`
+    + `willReadFrequently`, stores the result in the cache; (c) `tintKey`
+    stamp on `[data-tone-root]` blocks late async results from tinting a page
+    navigated away from; (d) lookup now matches root itself or a descendant.
+    Call sites pass title/name for the hash fallback. Verified in real Chromium
+    against the shipped function with a local red PNG: phase 1 instant
+    `hsl(166,45%,45%)` -> idle cross-fade to `rgb(255,0,0)`, cache persisted;
+    phase 2 (repeat visit) instant `rgb(255,0,0)` with ZERO poster network
+    requests. Screenshot: tint-proof.png. NOT phone-tested — only Imran's
+    device counts.

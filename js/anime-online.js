@@ -1359,7 +1359,7 @@
         '</div>' +
         '<div class="god-chaplist">' + rows + '</div>';
       var scrim = openPopup(title, 'MangaDex · pick a chapter to start reading', body);
-      tintFromPoster(scrim, poster); // 0.6s --tone cross-fade, same as detail pages
+      tintFromPoster(scrim, poster, title); // 0.6s --tone cross-fade, same as detail pages
       scrim.addEventListener('click', function (e) {
         var b = e.target.closest('[data-chap]');
         if (!b) return;
@@ -1867,7 +1867,7 @@
       (d.characters || []).forEach(function (c) {
         if (c && c.id) API().characterDetail(provider, c.id, c.name).catch(function () {});
       });
-      tintFromPoster(mount, d.image);
+      tintFromPoster(mount, d.image, d.title);
       mountDetailVideo(mount, d, mediaType);
       mountMangaSlideshow(mount, d);
       mountEpList(mount, provider, id, d, (d.mediaType || mediaType) === 'MANGA');
@@ -2667,26 +2667,71 @@
   }
 
   // Chameleon accent: sample the poster's dominant tone and tint the detail UI.
-  function tintFromPoster(root, src) {
+  // Instant by design: a cached tone (or a deterministic title-hash tone) is
+  // applied synchronously, then real extraction runs idle and cross-fades in
+  // via the registered --tone transition. Extracted tones persist in
+  // localStorage, so repeat visits never touch the network at all.
+  var TONE_LS = 'mpv2:tone:v1';
+  function toneCacheGet(src) {
+    try { return (JSON.parse(localStorage.getItem(TONE_LS) || '{}'))[src] || null; }
+    catch (e) { return null; }
+  }
+  function toneCacheSet(src, rgb) {
+    try {
+      var o = JSON.parse(localStorage.getItem(TONE_LS) || '{}');
+      o[src] = rgb;
+      var ks = Object.keys(o);
+      while (ks.length > 200) { delete o[ks[0]]; ks = Object.keys(o); }
+      localStorage.setItem(TONE_LS, JSON.stringify(o));
+    } catch (e) { /* private mode / quota — extraction still works per visit */ }
+  }
+  function toneFromHash(str) {
+    var h = 0;
+    for (var i = 0; i < str.length; i++) { h = (h * 31 + str.charCodeAt(i)) | 0; }
+    return 'hsl(' + (Math.abs(h) % 360) + ',45%,45%)';
+  }
+  function tintTarget(root) {
+    if (!root) return null;
+    if (root.matches && root.matches('[data-tone-root]')) return root;
+    return root.querySelector('[data-tone-root]');
+  }
+  function tintApply(root, src, value) {
+    var el = tintTarget(root);
+    // Stamp check: never let a late async result tint a page we navigated away from.
+    if (el && el.dataset.tintKey === src) el.style.setProperty('--tone', value);
+  }
+  function tintFromPoster(root, src, label) {
     if (!src) return;
-    var img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = function () {
-      try {
-        var c = document.createElement('canvas');
-        c.width = c.height = 24;
-        var x = c.getContext('2d');
-        x.drawImage(img, 0, 0, 24, 24);
-        var px = x.getImageData(0, 0, 24, 24).data;
-        var r = 0, g = 0, b = 0, n = 0;
-        for (var i = 0; i < px.length; i += 16) { r += px[i]; g += px[i + 1]; b += px[i + 2]; n++; }
-        r = Math.round(r / n); g = Math.round(g / n); b = Math.round(b / n);
-        var el = root.querySelector('[data-tone-root]');
-        if (el) el.style.setProperty('--tone', 'rgb(' + r + ',' + g + ',' + b + ')');
-      } catch (e) { /* tainted canvas — keep section accent */ }
+    var el = tintTarget(root);
+    if (el) {
+      el.dataset.tintKey = src;
+      var hit = toneCacheGet(src);
+      el.style.setProperty('--tone', hit ? 'rgb(' + hit + ')' : toneFromHash(label || src));
+      if (hit) return; // cached tone: zero image work, zero network
+    }
+    var run = function () {
+      var img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.decoding = 'async';
+      img.onload = function () {
+        try {
+          var c = document.createElement('canvas');
+          c.width = c.height = 24; // already tiny: the pixel work is microseconds
+          var x = c.getContext('2d', { willReadFrequently: true });
+          x.drawImage(img, 0, 0, 24, 24);
+          var px = x.getImageData(0, 0, 24, 24).data;
+          var r = 0, g = 0, b = 0, n = 0;
+          for (var i = 0; i < px.length; i += 16) { r += px[i]; g += px[i + 1]; b += px[i + 2]; n++; }
+          var rgb = Math.round(r / n) + ',' + Math.round(g / n) + ',' + Math.round(b / n);
+          toneCacheSet(src, rgb);
+          tintApply(root, src, 'rgb(' + rgb + ')');
+        } catch (e) { /* tainted canvas — keep the instant fallback tone */ }
+      };
+      img.onerror = function () {};
+      img.src = src;
     };
-    img.onerror = function () {};
-    img.src = src;
+    if (window.requestIdleCallback) window.requestIdleCallback(run, { timeout: 1500 });
+    else setTimeout(run, 0);
   }
 
   /* ------------------------- character detail --------------------------- */
@@ -2765,7 +2810,7 @@
       API().characterDetail(provider, charId, charName).then(function (c) {
         document.title = c.name + ' · ' + sec.name + ' · Media Player V2';
         mount.innerHTML = characterHtml(sec, provider, c);
-        tintFromPoster(mount, c.image);
+        tintFromPoster(mount, c.image, c.name);
         window.scrollTo(0, 0);
       }).catch(function (err) {
         if (attempt < 3) { setTimeout(load, attempt * 1200); return; }
