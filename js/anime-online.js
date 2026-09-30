@@ -1977,6 +1977,20 @@
     });
   }
 
+  // hanime.tv lists each episode as its own video ("Kakushi Dere 1/2/3").
+  // Group franchise videos by series base name so multi-episode series
+  // get a proper Episodes row instead of vanishing into the brand row.
+  function haSeriesBase(name) {
+    return String(name || '')
+      .replace(/\s*(?:part|vol\.?|volume|ep\.?|episode|#)\s*\d+\s*$/i, '')
+      .replace(/[\s\-:]+?\d+\s*$/, '')
+      .trim().toLowerCase();
+  }
+  function haEpNum(name) {
+    var m = String(name || '').match(/(\d+)\s*$/);
+    return m ? parseInt(m[1], 10) : 0;
+  }
+
   function hanimeDetailHtml(sec, d, slug) {
     var v = d.video || {};
     var year = String(v.released_at || '').slice(0, 4);
@@ -1991,9 +2005,33 @@
       return '<span class="chip">' + esc(t) + '</span>';
     }).join('');
     var fr = d.franchise || {};
-    var others = ((fr.videos) || []).filter(function (r) {
-      return r && r.slug && String(r.slug) !== String(v.slug || slug);
-    }).slice(0, 24);
+    var base = haSeriesBase(v.name);
+    var eps = [], rest = [];
+    ((fr.videos) || []).forEach(function (r) {
+      if (!r || !r.slug) return;
+      var isSelf = String(r.slug) === String(v.slug || slug);
+      if (isSelf || (base && haSeriesBase(r.name) === base)) eps.push(r);
+      else rest.push(r);
+    });
+    eps.sort(function (a, b) { return haEpNum(a.name) - haEpNum(b.name); });
+    // The franchise list never contains the video itself — add it so the
+    // current episode appears in its own Episodes row.
+    var selfSlug = String(v.slug || slug);
+    if (!eps.some(function (r) { return String(r.slug) === selfSlug; })) {
+      eps.push({ slug: v.slug || slug, name: v.name, poster_url: v.poster_url, brand: v.brand });
+      eps.sort(function (a, b) { return haEpNum(a.name) - haEpNum(b.name); });
+    }
+    var epRow = eps.length > 1
+      ? '<section class="online-block"><h2>Episodes</h2><div class="rel-strip">' + eps.map(function (r) {
+          var isSelf = String(r.slug) === String(v.slug || slug);
+          return '<a class="poster-card' + (isSelf ? ' current' : '') + '" href="#/' + SEC_ID +
+            '/online/hanime/' + encodeURIComponent(r.slug) +
+            '"><span class="poster-img"><img src="' + esc(r.poster_url || '') + '" alt="' +
+            esc(r.name || '') + '" loading="lazy"></span><span class="poster-title">' +
+            esc(r.name || r.slug) + '</span><span class="poster-meta">Episode ' +
+            haEpNum(r.name) + (isSelf ? ' · watching' : '') + '</span></a>';
+        }).join('') + '</div></section>' : '';
+    var others = rest.slice(0, 24);
     var frRow = others.length
       ? '<section class="online-block"><h2>More from ' + esc(fr.title || v.brand || 'this brand') +
         '</h2><div class="rel-strip">' + others.map(function (r) {
@@ -2021,7 +2059,7 @@
           '</p></section>' : '') +
         (tags ? '<section class="online-block"><h2>Tags</h2><div class="chip-row">' + tags +
           '</div></section>' : '') +
-        frRow + '</div></div>';
+        epRow + frRow + '</div></div>';
   }
 
   function fmtCompact(n) {

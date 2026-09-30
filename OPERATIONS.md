@@ -757,3 +757,14 @@ Obey this on every update. Updated 2026-09-30.
     detail-copy, rel-strip, etc.). Verified jsdom with live worker data:
     title/meta/tags(16)/related(10)/play/back all render; rel links point
     at the hanime detail route. PUSHED 2026-10-01 ~01:56 +04 (PAT transient, scrubbed). NOT phone-tested.
+46. 2026-10-01 — hanime details: Episodes row (Imran: "in hentai anime do
+    all series have one episode??" — no, hanime.tv lists each episode as
+    its own video). hanimeDetailHtml now groups franchise videos by series
+    base name (haSeriesBase strips trailing numbers/part/vol markers;
+    haEpNum sorts) and renders an "Episodes" section above the brand row
+    when 2+ episodes are found; the current video is marked "watching".
+    The franchise list never contains the video itself, so it is added
+    synthetically. Single-episode videos show no Episodes row (verified).
+    Verified jsdom with live data: Kakushi Dere 2 -> Episodes 1/2/3 with
+    "Episode 2 · watching"; Itadaki! Seieki -> no Episodes row. Committed
+    locally, NOT pushed, NOT phone-tested.
