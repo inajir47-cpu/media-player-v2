@@ -325,6 +325,36 @@ Obey this on every update. Updated 2026-09-30.
     back to Action with no adult call, normal Action genre still uses
     byGenre. Local commit, NOT pushed (needs fresh PAT). Phone test
     pending — only Imran's device counts.
+20. 2026-09-30 — TMDB recommendations for Movies + Anime (Imran pasted his
+    own TMDB API key in chat and asked for it to be used; key is NEVER
+    stored in code/memory/files — it lives only in the existing runtime
+    Settings slot `mpv2_tmdb_key_v1`, entered by Imran at Animation →
+    Settings → Online data → TMDB API key).
+    `js/anime-api.js`: new cached `tmdbTrendingMovies(includeAdult)` →
+    `/trending/movie/week` and `tmdbTvRecommendations(title,
+    includeAdult)` → title search + `/tv/{id}/recommendations`, both
+    normalized to {id, media, title, image, year, rating} via the existing
+    `tmdbGet`/`cached` plumbing (key-change cache invalidation already
+    handled); never throw — no key or any failure resolves to [].
+    `js/anime-online.js`: new "Trending Movies" block on the Movies home
+    (`tmdbMoviesBlockHtml` + `mountTmdbMovies`) — poster cards with year +
+    TMDB rating; without a saved key it shows a pointer to the Settings
+    field instead of a dead row. New "More Like This" row on the anime
+    detail page (`mountTmdbRecommendations`, seeded by the title, skipped
+    for manga/adult titles). Cards link out to the title's TMDB page; the
+    existing document-level external-confirm modal handles the tap, so
+    Movies stays design-only (no in-app detail/playback pipeline added).
+    `js/app.js`: two surgical insertions following the Discover-block
+    pattern (append block HTML on movies home, mount in `wirePage`).
+    Verified: real Chromium **9/9** with canned TMDB responses — no-key
+    prompt with zero TMDB traffic (movies home + detail), key set renders
+    2 trending cards (title/year/rating, `api_key=` on the request), card
+    href points at themoviedb.org, tap opens the external-confirm modal
+    without leaving the app, detail page shows "More Like This" with the
+    canned recommendation (search + recommendations endpoints called),
+    and the key string never appears in page HTML. Local commit, NOT
+    pushed (needs fresh PAT). Phone test pending — only Imran's device
+    counts.
 
 ## Standing rules — obey on every update
 

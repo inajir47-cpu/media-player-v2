@@ -1018,6 +1018,44 @@
     }).catch(function () { return items; });
   }
 
+  /* ================= TMDB recommendations (optional key) ================= */
+  /* Trending movies for the Movies home + "More Like This" TV recommendations
+     for the anime detail page. Normalized to
+     {id, media:'movie'|'tv', title, image, year, rating}. Never throws:
+     no key or any failure resolves to []. */
+  function tmdbNorm(list, media) {
+    return (list || []).filter(function (r) {
+      return r && r.id && r.poster_path;
+    }).slice(0, 12).map(function (r) {
+      var date = r.release_date || r.first_air_date || '';
+      return {
+        id: r.id, media: media,
+        title: r.title || r.name || 'Untitled',
+        image: 'https://image.tmdb.org/t/p/w500' + r.poster_path,
+        year: date ? date.slice(0, 4) : '',
+        rating: (typeof r.vote_average === 'number' && r.vote_average > 0)
+          ? (Math.round(r.vote_average * 10) / 10).toFixed(1) : ''
+      };
+    });
+  }
+  function tmdbTrendingMovies(includeAdult) {
+    if (!tmdbKey()) return Promise.resolve([]);
+    return cached('tmdb:trending:movie', function () {
+      return tmdbGet('/trending/movie/week' + (includeAdult ? '?include_adult=true' : ''))
+        .then(function (j) { return tmdbNorm(j.results, 'movie'); });
+    }).catch(function () { return []; });
+  }
+  function tmdbTvRecommendations(title, includeAdult) {
+    if (!tmdbKey() || !title) return Promise.resolve([]);
+    return tmdbTvId(title).then(function (tvId) {
+      if (!tvId) return [];
+      return cached('tmdb:reco:tv:' + tvId, function () {
+        return tmdbGet('/tv/' + tvId + '/recommendations' + (includeAdult ? '?include_adult=true' : ''))
+          .then(function (j) { return tmdbNorm(j.results, 'tv'); });
+      });
+    }).catch(function () { return []; });
+  }
+
   /* ============================ public API =============================== */
 
   var GENRES = ['Action', 'Adventure', 'Comedy', 'Drama', 'Fantasy', 'Horror',
@@ -1290,6 +1328,8 @@
     },
     getTmdbKey: tmdbKey,
     setTmdbKey: tmdbSetKey,
+    tmdbTrendingMovies: tmdbTrendingMovies,
+    tmdbTvRecommendations: tmdbTvRecommendations,
     chapters: function (provider, id, detail, page) {
       var p = PROVIDERS[provider] ? provider : getProvider();
       page = page || 1;

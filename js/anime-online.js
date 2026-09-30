@@ -1864,6 +1864,7 @@
       mountMangaSlideshow(mount, d);
       mountEpList(mount, provider, id, d, (d.mediaType || mediaType) === 'MANGA');
       mountRecommendations(mount, provider, id, d, (d.mediaType || mediaType));
+      mountTmdbRecommendations(mount, d);
       whenStreamReady(function (S) { S.wireDetail(mount, provider, id, d, mediaType); });
       var woBtn = mount.querySelector('[data-watch-order]');
       if (woBtn) woBtn.addEventListener('click', function () { openWatchOrder(provider, d); });
@@ -1972,6 +1973,12 @@
         }).join('') + '</div></section>' : '';
     var studios = (d.studios || []).length ? '<p class="detail-studios">' + esc(d.studios.join(' · ')) + '</p>' : '';
     var recoPh = '<section class="online-block" data-reco-block hidden><h2>Recommended</h2><div class="rel-strip" data-reco-grid></div></section>';
+    // TMDB "More Like This": filled lazily after the detail renders (see
+    // mountTmdbRecommendations). Cards link out to TMDB; the document-level
+    // external-confirm modal handles the tap. Hidden when there is no key
+    // or no results.
+    var tmdbRecoPh = '<section class="online-block" data-tmdb-reco-block hidden><h2>More Like This</h2>' +
+      '<div class="rel-strip" data-tmdb-reco-grid></div></section>';
     return '<div class="online-detail" data-tone-root>' +
       (d.banner ? '<div class="detail-banner"><img src="' + esc(d.banner) + '" alt="" loading="lazy"></div>' : '') +
       '<div class="online-wrap"><a class="back-link" href="' + backHref + '">' +
@@ -1991,7 +1998,7 @@
         '<section class="online-block"><h2>Synopsis</h2><p class="synopsis">' +
           esc(d.synopsis || 'No synopsis available.') + '</p></section>' +
         epListPlaceholder(d, isManga) +
-        seasons + cast + rel + recoPh + '</div></div>';
+        seasons + cast + rel + recoPh + tmdbRecoPh + '</div></div>';
   }
 
   // "Recommended" row: fetched lazily after the detail renders (AniList
@@ -2018,6 +2025,65 @@
       block.hidden = false;
     }).catch(function () { /* no recommendations: section stays hidden */ });
   }
+
+  /* ------------------------- TMDB recommendations ------------------------ */
+  // "More Like This" on the anime detail page + "Trending Movies" on the
+  // Movies home. Key comes from Animation → Settings → Online data
+  // (mpv2_tmdb_key_v1); it is never stored in code. Cards link out to the
+  // title's TMDB page — the document-level external-confirm modal handles
+  // the tap, so Movies stays design-only (no in-app detail/playback pipe).
+  function tmdbCardHtml(r) {
+    var href = 'https://www.themoviedb.org/' + r.media + '/' + r.id;
+    var score = r.rating ? '<span class="poster-score">' + esc(r.rating) + '</span>' : '';
+    var meta = r.year ? '<span class="poster-meta">' + esc(r.year) + '</span>' : '';
+    return '<a class="poster-card" href="' + href + '" target="_blank" rel="noopener">' +
+      '<span class="poster-img"><img src="' + esc(r.image) + '" alt="' + esc(r.title) +
+      '" loading="lazy">' + score + '</span>' +
+      '<span class="poster-title">' + esc(r.title) + '</span>' + meta + '</a>';
+  }
+
+  // Detail page: "More Like This", seeded by the current anime title.
+  // Skipped for manga and adult titles; the section stays hidden without
+  // a key or when TMDB returns nothing.
+  function mountTmdbRecommendations(mount, d) {
+    var block = mount.querySelector('[data-tmdb-reco-block]');
+    if (!block) return;
+    if ((d.mediaType || '') === 'MANGA' || d.isAdult || !API().tmdbTvRecommendations) return;
+    API().tmdbTvRecommendations(d.title, adultAllowed()).then(function (items) {
+      if (!block.isConnected) return;
+      items = (items || []).slice(0, 12);
+      if (!items.length) return; // stays hidden
+      block.querySelector('[data-tmdb-reco-grid]').innerHTML = items.map(tmdbCardHtml).join('');
+      block.hidden = false;
+    }).catch(function () { /* no TMDB recs: section stays hidden */ });
+  }
+
+  // Movies home: "Trending Movies" (TMDB, this week). Without a saved key
+  // the block shows a pointer to the Settings field instead of a dead row.
+  window.MPV2.tmdbMoviesBlockHtml = function () {
+    var hasKey = !!(API().getTmdbKey && API().getTmdbKey());
+    var body = hasKey
+      ? '<div class="online-wrap"><div class="rel-strip">' + skeletonCards(6) + '</div></div>'
+      : '<div class="online-wrap"><p class="muted-note">Trending movies need your free TMDB key — ' +
+        'add it once at <a href="#/animation/settings">Animation → Settings → Online data</a>, then come back.</p></div>';
+    return '<section class="row online-discover-block" id="tmdbMoviesBlock">' +
+      '<div class="row-head"><h2>Trending Movies</h2>' +
+      '<span class="muted-link">TMDB · this week</span></div>' + body + '</section>';
+  };
+
+  window.MPV2.mountTmdbMovies = function (root) {
+    var block = root.querySelector('#tmdbMoviesBlock');
+    if (!block || block.getAttribute('data-mounted')) return;
+    block.setAttribute('data-mounted', '1');
+    var strip = block.querySelector('.rel-strip');
+    if (!strip || !API().tmdbTrendingMovies) return; // no key: prompt is showing
+    API().tmdbTrendingMovies(adultAllowed()).then(function (items) {
+      if (!strip.isConnected) return;
+      strip.innerHTML = items.length
+        ? items.map(tmdbCardHtml).join('')
+        : '<p class="muted-note">Could not load trending movies right now.</p>';
+    });
+  };
 
   // Placeholder for the episode (anime) / chapter (manga) list; filled in
   // lazily after the detail renders. Movies (1 episode) get a single

@@ -499,6 +499,10 @@
       if (sec.id === 'animation' && window.MPV2.discoverBlockHtml) {
         html += window.MPV2.discoverBlockHtml(sec);
       }
+      // ONLINE PHASE: TMDB trending movies on the Movies home page.
+      if (sec.id === 'movies' && window.MPV2.tmdbMoviesBlockHtml) {
+        html += window.MPV2.tmdbMoviesBlockHtml();
+      }
     } else if (tab === 'search') {
       html = pageHead(sec, 'Search', 'Find titles across ' + sec.name.toLowerCase() + '.') +
         (window.MPV2 && window.MPV2.godToggleHtml ? window.MPV2.godToggleHtml() : '') +
@@ -1797,6 +1801,10 @@
     // ONLINE PHASE: live manga block on the Animation Manga tab.
     if (tab === 'manga' && sec.id === 'animation' && window.MPV2.mountMangaBlock) {
       window.MPV2.mountMangaBlock(sec, root);
+    }
+    // ONLINE PHASE: TMDB trending movies on the Movies home page.
+    if (tab === 'home' && sec.id === 'movies' && window.MPV2.mountTmdbMovies) {
+      window.MPV2.mountTmdbMovies(root);
     }
     // ONLINE PHASE: live Series / Movies / OVAs rows on the Animation Anime tab.
     if (tab === 'anime' && sec.id === 'animation' && window.MPV2.mountAnimeTab) {
