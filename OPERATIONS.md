@@ -661,3 +661,16 @@ Obey this on every update. Updated 2026-09-30.
     upstream corruptions, 0 leftover relative backend calls, 0 doublings,
     node --check clean. Imran must re-run the workflow to get a fixed APK.
     NOT phone-tested — only Imran's device counts.
+38. 2026-10-01 — Z-Anime English dub now lights the DUB badge. Gap (Imran:
+    "add Z-Anime also for English"): Z-Anime was already a provider option
+    (Z badge + "English sub & dub" dialog entry), but availability only
+    probed its SUB embed — its DUB was never checked, so it could never
+    light the DUB badge. Fix: js/zanime-provider.js extracted the probe
+    into zProbe(anilistId, ep, audio, cache) with separate sub/dub session
+    caches, added zHasDub() (exported as window.zaHasDub); js/stream.js
+    checkEpisodeStaged() probes zaHasDub in the fast lane — a dub hit sets
+    avail.dub + avail.zanime (provider option appears even when only dub
+    exists). Sub behaviour byte-identical. Verified node: sub probe hits
+    .../1/sub, dub probe hits .../1/dub, caches independent, no refetch on
+    repeat. Zane's upstream could not be verified from the sandbox (worker
+    unreachable from here) — phone test is the verdict. NOT phone-tested.

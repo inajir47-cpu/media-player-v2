@@ -281,6 +281,12 @@
         cb(avail);
       }, function () { cb(avail); }));
     }
+    if (ctx.anilistId && typeof window.zaHasDub === 'function') {
+      fast.push(window.zaHasDub(ctx.anilistId, n).then(function (d) {
+        if (d) { avail.dub = true; avail.zanime = true; }
+        cb(avail);
+      }, function () { cb(avail); }));
+    }
     if (ctx.title && typeof window.cdHasEpisode === 'function') {
       fast.push(window.cdHasEpisode(ctx.title, n).then(function (h) {
         avail.hindi2 = !!h;

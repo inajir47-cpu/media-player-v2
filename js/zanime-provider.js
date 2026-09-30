@@ -41,11 +41,12 @@
   // Fetches through our worker for CORS; treats the "Embed error"
   // page as unavailable. Cached per (anilistId, ep) for the session.
   var availCache = {};
-  function zHasEpisode(anilistId, ep) {
+  var dubCache = {};
+  function zProbe(anilistId, ep, audio, cache) {
     if (!anilistId || !ep) return Promise.resolve(false);
     var key = anilistId + ':' + ep;
-    if (key in availCache) return Promise.resolve(availCache[key]);
-    var url = zEmbedUrl(anilistId, ep, 'sub', SERVERS[0]);
+    if (key in cache) return Promise.resolve(cache[key]);
+    var url = zEmbedUrl(anilistId, ep, audio, SERVERS[0]);
     var proxied = WORKER + '/hls?d=' + b64url(url);
     return fetch(proxied, { method: 'GET' }).then(function (r) {
       return r.text();
@@ -53,20 +54,26 @@
       var ok = t.indexOf('Embed error') === -1 &&
                t.indexOf('Playback unavailable') === -1 &&
                t.length > 1000;
-      availCache[key] = ok;
+      cache[key] = ok;
       return ok;
     }).catch(function () {
       return false;
     });
   }
+  // Sub availability (existing behaviour, unchanged results).
+  function zHasEpisode(anilistId, ep) { return zProbe(anilistId, ep, 'sub', availCache); }
+  // Dub availability — lets Z-Anime light the English DUB badge.
+  function zHasDub(anilistId, ep) { return zProbe(anilistId, ep, 'dub', dubCache); }
 
   window.ZAnimeProvider = {
     id: 'zanime',
     label: 'Z-Anime',
     servers: SERVERS,
     embedUrl: zEmbedUrl,
-    hasEpisode: zHasEpisode
+    hasEpisode: zHasEpisode,
+    hasDub: zHasDub
   };
   // Alias matching the naming style of the other providers.
   window.zaHasEpisode = zHasEpisode;
+  window.zaHasDub = zHasDub;
 })();
