@@ -231,7 +231,7 @@
                    name: (e.node.name && e.node.name.full) || '?',
                    image: (e.node.image && e.node.image.large) || '',
                    role: e.role === 'MAIN' ? 'Main' : 'Supporting',
-                   va: va ? { id: va.id || null, name: va.name.full || '?', image: (va.image && va.image.large) || '' } : null };
+                   va: va ? { id: va.id || null, src: 'anilist', name: va.name.full || '?', image: (va.image && va.image.large) || '' } : null };
         });
         item.relations = rels.slice(0, 12).map(function (e) {
           var rsd = e.node.startDate || {};
@@ -452,7 +452,8 @@
                      name: c.character.name || '?',
                      image: ((c.character.images || {}).jpg || {}).image_url || '',
                      role: c.role || '',
-                     va: va ? { name: va.person.name || '?',
+                     va: va ? { id: (va.person && va.person.mal_id) || null, src: 'jikan',
+                                name: va.person.name || '?',
                                 image: (((va.person.images || {}).jpg) || {}).image_url || '' } : null };
           });
           item.relations = item.seasons.slice(0, 12);

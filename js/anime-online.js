@@ -141,9 +141,9 @@
     return '<header class="ch-pop-hero"><span class="poster-img big"><img src="' + esc(c.image) +
       '" alt="' + esc(c.name) + '"></span>' +
       '<div class="detail-copy"><h1 class="ch-pop-name">' + esc(c.name) + '</h1>' +
+      (c.native ? '<p class="detail-meta dim">' + esc(c.native) + '</p>' : '') +
       (role ? '<span class="ch-role-tag ' + (role === 'Main' ? 'is-main' : 'is-side') + '">' +
         esc(role === 'Main' ? 'Main character' : 'Supporting character') + '</span>' : '') +
-      (c.native ? '<p class="detail-meta dim">' + esc(c.native) + '</p>' : '') +
       charFacts(c) + '</div></header>' +
       '<h4 class="rv-sec">About</h4>' + charDescription(c) + anime + vas;
   }
@@ -956,7 +956,7 @@
     var vaPhoto = c.va && c.va.image
       ? '<img class="cast-va-photo' + (c.va.id ? ' is-link' : '') + '" src="' + esc(c.va.image) + '" alt="' + esc(c.va.name) + '" loading="lazy"' +
         (c.va.id ? ' data-va-provider="' + esc(provider) + '" data-va-id="' + esc(String(c.va.id)) +
-          '" data-va-name="' + esc(c.va.name) + '" data-va-src="anilist"' +
+          '" data-va-name="' + esc(c.va.name) + '" data-va-src="' + esc(c.va.src || 'anilist') + '"' +
           ' tabindex="0" role="link" aria-label="' + esc(c.va.name) + ' profile"' : '') + '>'
       : '<span class="cast-card-arrow">' + icon('chevron') + '</span>';
     var roleTag = c.role
