@@ -700,3 +700,10 @@ Obey this on every update. Updated 2026-09-30.
     embed URL with it (falls back to hd-1). Verified node: hd-1 fail ->
     hd-2 probed and used, embed URL correct, session cache stops refetches,
     sub/dub caches independent. NOT phone-tested.
+41. 2026-10-01 — JustAnime dialog fix (Imran's phone screenshot): selecting
+    JustAnime showed no language options and the wrong subtitle
+    ("English stream · FlixCloud"). Cause: providerDesc()/providerLangs()
+    had no branch for the new kind 'ja'. Added both, mirroring 'za':
+    desc "English sub & dub · senshi", langs Japanese/English
+    (Japanese->sub, English->dub). Also fixes the in-player language
+    switcher, which uses providerLangs(). NOT phone-tested.

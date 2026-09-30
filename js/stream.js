@@ -636,6 +636,7 @@
     if (p.kind === 'hi') return 'Hindi dub · ToonStream';
     if (p.kind === 'hi2') return 'Hindi dub · Rare Animes';
     if (p.kind === 'za') return 'English sub & dub · Z-Player';
+    if (p.kind === 'ja') return 'English sub & dub · senshi';
     var bits = [];
     if (p.sub) bits.push('sub'); if (p.dub) bits.push('dub');
     return 'English ' + (bits.join(' & ') || 'stream') + ' · FlixCloud';
@@ -643,6 +644,7 @@
   function providerLangs(p) {
     if (p.kind === 'hi' || p.kind === 'hi2') return ['Hindi'];
     if (p.kind === 'za') return ['Japanese', 'English'];
+    if (p.kind === 'ja') return ['Japanese', 'English'];
     var l = [];
     if (p.sub) l.push('Japanese');
     if (p.dub) l.push('English');
