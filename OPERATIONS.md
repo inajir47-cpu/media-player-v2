@@ -587,3 +587,25 @@ Obey this on every update. Updated 2026-09-30.
     page left the hash unchanged, hero swipe advanced slide 0->1, and tab bar
     tap navigated to #/animation/anime. NOT phone-tested — only Imran's device
     counts.
+34. 2026-09-30 — Automatic provider fallback: Jikan/Kitsu -> AniList.
+    `js/anime-api.js`: new `adapterCall()` wraps top10/byGenre/byFormat/search —
+    any Jikan/Kitsu failure (429/5xx, timeout, network) transparently retries
+    the equivalent AniList query; AniList is terminal and never falls back
+    further; if the fallback also fails the ORIGINAL error is rethrown so
+    retry screens keep their provider-specific hint. `detail()` and
+    `recommendations()` bridge foreign ids first (`anilistIdFor()`: Jikan MAL
+    id -> AniList `idMal` lookup; Kitsu id -> Kitsu /mappings -> MAL id ->
+    `idMal`), cached, served under the original cache key. New 15s `timed()`
+    wrapper on `jkGet`/`ksGet` so hanging providers engage the fallback
+    instead of wedging the UI. Also fixed a latent bug: `jikanSearch`/
+    `kitsuSearch` swallowed total blackouts into empty results (inner catch);
+    now both-halves-failed rejects so the fallback engages, while one
+    surviving half keeps the old partial-tolerance behavior.
+    Verified in real Chromium with stubbed network: Jikan 429 -> top10 and
+    MAL-id detail (bridged to AniList id 999 'Naruto') served from AniList;
+    Kitsu 429 -> search served from AniList; Jikan recommendations bridged;
+    double failure rethrows 'Jikan request failed (HTTP 429)'; hanging Jikan
+    fell back after exactly 15.0s. Caveat: a fully-down Kitsu cannot serve its
+    own /mappings, so Kitsu-id deep links still retry — lists/search fall back
+    and fallback cards carry provider 'anilist', so normal navigation works.
+    NOT phone-tested — only Imran's device counts.

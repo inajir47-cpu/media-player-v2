@@ -61,6 +61,20 @@
     return err;
   }
 
+  // Jikan/Kitsu degrade by hanging instead of failing — cap every request so
+  // the provider fallback below can engage instead of wedging the UI forever.
+  function timed(promise, ms, label) {
+    var timer = null;
+    var timeout = new Promise(function (_, reject) {
+      timer = setTimeout(function () {
+        reject(new Error(label + ' timed out after ' + (ms / 1000) + 's'));
+      }, ms);
+    });
+    return Promise.race([promise, timeout]).then(
+      function (v) { clearTimeout(timer); return v; },
+      function (e) { clearTimeout(timer); throw e; });
+  }
+
   function pickTitle(t) {
     if (!t) return 'Unknown title';
     return t.english || t.romaji || t.en || t.canonical || 'Unknown title';
@@ -422,10 +436,10 @@
   var JK = 'https://api.jikan.moe/v4';
 
   function jkGet(path) {
-    return fetch(JK + path).then(function (res) {
+    return timed(fetch(JK + path).then(function (res) {
       if (!res.ok) throw httpError('Jikan', res);
       return res.json();
-    });
+    }), 15000, 'Jikan');
   }
 
   function jkItem(a, type) {
@@ -468,13 +482,19 @@
     var t = encodeURIComponent(q);
     function get(ep) {
       return jkGet('/' + ep + '?q=' + t + '&limit=12&order_by=members&sort=desc')
-        .catch(function () { return { data: [] }; });
+        .then(function (j) { return { ok: true, data: j.data || [] }; },
+              function () { return { ok: false, data: [] }; });
     }
     return cached('jikan:search:' + q.toLowerCase(), function () {
       return Promise.all([get('anime'), get('manga')]).then(function (parts) {
+        // Both halves failed (rate-limited/down): reject so the automatic
+        // provider fallback serves the AniList equivalent instead of a
+        // misleading empty result. One surviving half keeps the existing
+        // partial-tolerance behavior.
+        if (!parts[0].ok && !parts[1].ok) throw new Error('Jikan search failed');
         return {
-          anime: (((parts[0] || {}).data) || []).map(function (a) { return jkItem(a, 'ANIME'); }),
-          manga: (((parts[1] || {}).data) || []).map(function (a) { return jkItem(a, 'MANGA'); })
+          anime: (parts[0].data || []).map(function (a) { return jkItem(a, 'ANIME'); }),
+          manga: (parts[1].data || []).map(function (a) { return jkItem(a, 'MANGA'); })
         };
       });
     });
@@ -680,10 +700,10 @@
   var KS = 'https://kitsu.io/api/edge';
 
   function ksGet(path) {
-    return fetch(KS + path, { headers: { Accept: 'application/vnd.api+json' } }).then(function (res) {
+    return timed(fetch(KS + path, { headers: { Accept: 'application/vnd.api+json' } }).then(function (res) {
       if (!res.ok) throw httpError('Kitsu', res);
       return res.json();
-    });
+    }), 15000, 'Kitsu');
   }
 
   function ksItem(a, type) {
@@ -742,18 +762,24 @@
     var t = encodeURIComponent(q);
     function get(ep) {
       return ksGet('/' + ep + '?filter[text]=' + t + '&page[limit]=12')
-        .catch(function () { return { data: [] }; });
+        .then(function (j) { return { ok: true, data: j.data || [] }; },
+              function () { return { ok: false, data: [] }; });
     }
     return cached('kitsu:search:' + q.toLowerCase(), function () {
       return Promise.all([get('anime'), get('manga')]).then(function (parts) {
+        // Both halves failed (rate-limited/down): reject so the automatic
+        // provider fallback serves the AniList equivalent instead of a
+        // misleading empty result. One surviving half keeps the existing
+        // partial-tolerance behavior.
+        if (!parts[0].ok && !parts[1].ok) throw new Error('Kitsu search failed');
         function map(list, t) {
           return (list || []).map(function (d) {
             var at = d.attributes || {}; at.id = d.id; return ksItem(at, t);
           });
         }
         return {
-          anime: map(((parts[0] || {}).data), 'ANIME'),
-          manga: map(((parts[1] || {}).data), 'MANGA')
+          anime: map(parts[0].data, 'ANIME'),
+          manga: map(parts[1].data, 'MANGA')
         };
       });
     });
@@ -1259,6 +1285,60 @@
     kitsu:   { top: kitsuTop,   genre: kitsuGenre,   format: kitsuFormat,   detail: kitsuDetail,   character: null, reco: function () { return Promise.resolve([]); }, search: kitsuSearch }
   };
 
+  /* ============ automatic provider fallback: Jikan/Kitsu -> AniList ========
+     Jikan and Kitsu are rate-limited (HTTP 429) and flaky; AniList is the
+     reliable terminal provider. Any failure — 429/5xx, timeout, network —
+     transparently retries the equivalent query against AniList, so sections
+     populate instead of sticking on "Could not load data." AniList itself
+     never falls back further. If the fallback also fails, the ORIGINAL error
+     is rethrown so retry screens keep their provider-specific hint. */
+  function adapterCall(p, method, args) {
+    var fn = ADAPTERS[p] && ADAPTERS[p][method];
+    if (!fn) return Promise.reject(new Error('Not available for ' + ((PROVIDERS[p] || {}).name || p) + '.'));
+    if (p === 'anilist') return fn.apply(null, args);
+    return fn.apply(null, args).then(null, function (err) {
+      var fb = ADAPTERS.anilist[method];
+      if (!fb) throw err;
+      return fb.apply(null, args).then(null, function () { throw err; });
+    });
+  }
+
+  // Bridge a foreign provider id to an AniList id for detail/recommendation
+  // fallback. Jikan ids are MAL ids (AniList indexes idMal directly); Kitsu
+  // ids resolve through Kitsu's own mappings to a MAL id first. Bridge
+  // results are cached. Caveat: when Kitsu is fully down its mappings lookup
+  // cannot run, so a Kitsu-id deep link still shows retry — but lists and
+  // search fall back, and cards rendered from fallback payloads already carry
+  // provider 'anilist', so normal navigation keeps working.
+  function anilistIdFor(p, id, t) {
+    function viaMal(malId) {
+      malId = parseInt(malId, 10);
+      if (!malId) return Promise.reject(new Error('No MAL id to bridge.'));
+      return cached('albridge:mal:' + t + ':' + malId, function () {
+        return alQuery('query($idMal:Int,$t:MediaType){Media(idMal:$idMal,type:$t){id}}',
+          { idMal: malId, t: t }).then(function (d) {
+            var alId = d && d.Media && d.Media.id;
+            if (!alId) throw new Error('No AniList entry for MAL id ' + malId + '.');
+            return alId;
+          });
+      });
+    }
+    if (p === 'jikan') return viaMal(id);
+    if (p === 'kitsu') {
+      var ep = t === 'MANGA' ? 'manga' : 'anime';
+      return ksGet('/' + ep + '/' + id + '/mappings').then(function (j) {
+        var ms = (j && j.data) || [], at = null, i;
+        for (i = 0; i < ms.length; i++) {
+          var m = (ms[i] && ms[i].attributes) || {};
+          if (/^myanimelist(\/manga)?$/.test(m.externalSite || '') && m.externalId) { at = m; break; }
+        }
+        if (!at) throw new Error('No MAL mapping for Kitsu id ' + id + '.');
+        return viaMal(at.externalId);
+      });
+    }
+    return Promise.reject(new Error('No AniList bridge for provider ' + p + '.'));
+  }
+
   function mediaType(t) { return t === 'MANGA' ? 'MANGA' : 'ANIME'; }
 
   window.MPV2 = window.MPV2 || {};
@@ -1268,12 +1348,18 @@
     getProvider: getProvider,
     setProvider: setProvider,
     mdMangaUuid: mdMangaUuid, /* chunk 1 (manga reader): AniList/MAL title -> MangaDex UUID bridge */
-    top10: function (range, type) { return ADAPTERS[getProvider()].top(range || 'today', mediaType(type)); },
-    byGenre: function (genre, page, sort, type) { return ADAPTERS[getProvider()].genre(genre, page || 1, sort || 'popularity', mediaType(type)); },
-    byFormat: function (format, page) { return ADAPTERS[getProvider()].format(format, page || 1); },
+    top10: function (range, type) { return adapterCall(getProvider(), 'top', [range || 'today', mediaType(type)]); },
+    byGenre: function (genre, page, sort, type) { return adapterCall(getProvider(), 'genre', [genre, page || 1, sort || 'popularity', mediaType(type)]); },
+    byFormat: function (format, page) { return adapterCall(getProvider(), 'format', [format, page || 1]); },
     recommendations: function (id, type, provider) {
       var p = provider && PROVIDERS[provider] ? provider : getProvider();
-      return ADAPTERS[p].reco(id, mediaType(type));
+      var t = mediaType(type);
+      if (p === 'anilist') return ADAPTERS.anilist.reco(id, t);
+      return ADAPTERS[p].reco(id, t).then(null, function (err) {
+        return anilistIdFor(p, id, t).then(function (alId) {
+          return ADAPTERS.anilist.reco(alId, t);
+        }).then(null, function () { throw err; });
+      });
     },
     detail: function (provider, id, type) {
       var p = PROVIDERS[provider] ? provider : getProvider();
@@ -1283,7 +1369,16 @@
       var key = 'd:v2:' + p + ':' + t + ':' + id;
       var hit = api48Get(key);
       if (hit) return Promise.resolve(hit);
-      return ADAPTERS[p].detail(id, t).then(function (d) { api48Set(key, d); return d; });
+      function save(d) { api48Set(key, d); return d; }
+      if (p === 'anilist') return ADAPTERS.anilist.detail(id, t).then(save);
+      return ADAPTERS[p].detail(id, t).then(save, function (err) {
+        // Primary failed: bridge the foreign id and serve the AniList
+        // equivalent, cached under the original key so the retry is instant
+        // next time and downstream cards link with provider 'anilist'.
+        return anilistIdFor(p, id, t).then(function (alId) {
+          return ADAPTERS.anilist.detail(alId, t);
+        }).then(save, function () { throw err; });
+      });
     },
     characterDetail: function (provider, id, name) {
       var p = PROVIDERS[provider] ? provider : getProvider();
@@ -1363,9 +1458,7 @@
     },
     search: function (provider, q) {
       var p = PROVIDERS[provider] ? provider : getProvider();
-      var fn = ADAPTERS[p].search;
-      if (!fn) return Promise.reject(new Error('Search is not available for ' + PROVIDERS[p].name + '.'));
-      return fn(q);
+      return adapterCall(p, 'search', [q]);
     },
     // God Mode: direct provider-server search, bypassing the meta-APIs.
     godSearch: function (q) { return godSearch(q); },
