@@ -1269,6 +1269,7 @@
     if (adultOptIn()) {
       jobs.push(godSettled(godTimeout(godGlobalSearch('nhSearch', query))));
       jobs.push(godSettled(godTimeout(godGlobalSearch('htSearch', query))));
+      jobs.push(godSettled(godTimeout(godGlobalSearch('haSearch', query))));
     }
     return Promise.all(jobs).then(function (lists) {
       var out = [];

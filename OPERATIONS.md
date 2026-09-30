@@ -707,3 +707,18 @@ Obey this on every update. Updated 2026-09-30.
     desc "English sub & dub · senshi", langs Japanese/English
     (Japanese->sub, English->dub). Also fixes the in-player language
     switcher, which uses providerLangs(). NOT phone-tested.
+42. 2026-10-01 — hanime video provider added (Imran confirmed). hanime.tv's
+    API is signature-walled (all direct endpoints 404/401), so the
+    open-source hanime.tv-api scraper worker was deployed to Imran's own
+    Cloudflare account as hanime-scraper
+    (https://hanime-scraper.gmpdi020.workers.dev) using a transient API
+    token (discarded; first token pasted had wrong permissions, second
+    worked). Worker verified live: /api/search?q= and /api/video/:slug
+    return results + 720p/480p/360p m3u8 streams.
+    App wiring: new js/hanime-provider.js (haSearch God Mode items with
+    kind 'hanime' + isAdult, video() picks best quality); index.html loads
+    it; anime-api.js adds haSearch to God Mode jobs behind the 18+ opt-in;
+    anime-online.js renders hanime cards (18+ badge) and openGodCard plays
+    them after the adult warning; stream.js adds kind 'ha' resolve branch
+    and public playHanime(slug,title,poster) (isMovie hides episode nav).
+    Committed locally, NOT pushed, NOT phone-tested.

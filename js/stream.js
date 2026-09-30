@@ -859,6 +859,14 @@
             providerLabel: 'JustAnime · senshi' };
         });
       }
+      if (prov.kind === 'ha') {
+        // hanime: single video resolved by slug to a direct m3u8 through
+        // our scraper worker (CORS-open, plays as-is).
+        return window.HanimeProvider.video(ctx.hanimeSlug).then(function (v) {
+          return { url: v.url, audioTracks: [], subtitles: [],
+            providerLabel: 'hanime · hanime.tv' };
+        });
+      }
       if (prov.kind === 'za') {
         // Z-Anime: the worker serves a full HTML player page, so we hand
         // back an embed URL and let the player shell load it in an iframe.
@@ -1543,6 +1551,12 @@
     // Direct playback for one episode (used by Recently Watched continue).
     playEpisode: function (ctxLike, n) {
       checkEpisodeStaged(ctxLike, n, function (avail) { openProviderDialog(ctxLike, n, avail); });
+    },
+    // hanime (18+): play a single video by slug — no episode staging,
+    // no provider dialog. isMovie hides episode navigation in the shell.
+    playHanime: function (slug, title, poster) {
+      startWatch({ title: title || 'hanime video', poster: poster || '',
+        hanimeSlug: slug, isMovie: true }, 1, { kind: 'ha', name: 'hanime' }, 'Japanese');
     },
     // God Mode: direct reanime catalog search (English), normalized.
     searchReanime: function (q) {

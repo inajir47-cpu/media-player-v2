@@ -1236,6 +1236,8 @@
       attrs += ' data-god-nhid="' + esc(String(ref.id || '')) + '" data-god-title="' + esc(item.title) + '"';
     else if (ref.kind === 'hitomi')
       attrs += ' data-god-hitomi="' + esc(String(ref.id || '')) + '" data-god-title="' + esc(item.title) + '"';
+    else if (ref.kind === 'hanime')
+      attrs += ' data-god-hslug="' + esc(ref.slug || '') + '" data-god-title="' + esc(item.title) + '"';
     var badges = (item.langs || []).concat(item.audio || []).map(function (b) {
       return '<i class="st-b ' + langBadgeCls(b) + '">' + esc(String(b).toUpperCase()) + '</i>';
     }).join('');
@@ -1245,7 +1247,7 @@
       ' poster" loading="lazy">' +
       '<span class="server-tag ' + (GOD_SERVER_CLASS[item.server] || '') + '">' +
       esc(item.server) + '</span>' +
-      (ref.kind === 'nhentai' || ref.kind === 'hitomi' ? '<span class="adult18 god-adult">18+</span>' : '') +
+      (ref.kind === 'nhentai' || ref.kind === 'hitomi' || ref.kind === 'hanime' ? '<span class="adult18 god-adult">18+</span>' : '') +
       (badges ? '<span class="god-langbadges">' + badges + '</span>' : '') + '</span>' +
       '<span class="poster-title">' + esc(item.title) + '</span>' +
       '<span class="poster-meta">' + esc(meta) + '</span></button>';
@@ -1384,7 +1386,7 @@
     // Recently Viewed on every tap. Adult galleries log only after the 18+
     // Proceed below, so a cancelled warning leaves no trace (same rule as
     // the standard detail page).
-    if (kind !== 'nhentai' && kind !== 'hitomi') godRecordView(card, kind);
+    if (kind !== 'nhentai' && kind !== 'hitomi' && kind !== 'hanime') godRecordView(card, kind);
     if (kind === 'mangadex') {
       openGodMangaDetail(card); // adaptive detail view, no auto-open
     } else if (kind === 'hindi') {
@@ -1457,6 +1459,20 @@
                    href: location.hash, readerProvider: 'hitomi' },
             chapter: { id: 'ht-' + htid, ch: '1', title: p.title, pages: p.pages } });
         }).catch(function () { if (window.MPV2.toast) window.MPV2.toast('Could not open this gallery.'); });
+      });
+    } else if (kind === 'hanime') {
+      // hanime video: 18+ safety warning every time (same as adult AniList
+      // titles), then straight into the video player with the resolved m3u8.
+      var haslug = card.getAttribute('data-god-hslug');
+      var hat = card.getAttribute('data-god-title') || 'hanime video';
+      var HP = window.HanimeProvider;
+      var ST = window.MPV2 && window.MPV2.Stream;
+      if (!haslug || !HP || !ST || typeof ST.playHanime !== 'function') return;
+      adultWarnModal({ title: hat }, function () {
+        godRecordView(card, kind); // log only on Proceed, not on tap
+        if (window.MPV2.toast) window.MPV2.toast('Loading video\u2026');
+        var haimg = card.querySelector('img');
+        ST.playHanime(haslug, hat, haimg ? (haimg.getAttribute('src') || '') : '');
       });
     }
   }
