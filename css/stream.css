@@ -249,18 +249,38 @@
 }
 .st-yt-ep.has-bg:hover { background-image: linear-gradient(90deg, rgba(0,0,0,.82) 0%, rgba(0,0,0,.48) 60%, rgba(0,0,0,.28) 100%),
     var(--ep-bg); }
-/* server / audio dropdowns below the player */
-.st-yt-select {
-  border-radius: 999px; padding: 9px 34px 9px 16px;
-  background-color: rgba(255,255,255,.08);
+/* custom themed dropdowns (dark glass, replace native select) */
+.st-yt-dd { position: relative; flex: none; }
+.st-yt-dd-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  border-radius: 999px; padding: 9px 14px;
+  background: rgba(255,255,255,.08);
   border: 1px solid rgba(255,255,255,.12);
   color: #fff; font-size: 13px; font-weight: 600; cursor: pointer;
-  appearance: none; -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23fff' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: right 13px center;
-  max-width: 180px; text-overflow: ellipsis;
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  max-width: 180px;
 }
-.st-yt-select option { background: #1a1a1e; color: #fff; }
+.st-yt-dd-btn .st-yt-dd-val { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-yt-dd-btn .icon { width: 12px; height: 12px; opacity: .7; flex: none; transition: transform .18s ease; }
+.st-yt-dd.open .st-yt-dd-btn { border-color: rgba(255,255,255,.28); background: rgba(255,255,255,.12); }
+.st-yt-dd.open .st-yt-dd-btn .icon { transform: rotate(180deg); }
+.st-yt-dd-list {
+  position: absolute; top: calc(100% + 8px); left: 0; min-width: 100%;
+  background: rgba(26,26,30,.97);
+  border: 1px solid rgba(255,255,255,.12); border-radius: 14px;
+  padding: 6px; z-index: 60; margin: 0;
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 12px 32px rgba(0,0,0,.5);
+}
+.st-yt-dd-list[hidden] { display: none; }
+.st-yt-dd-opt {
+  display: flex; align-items: center; width: 100%;
+  padding: 10px 12px; border: none; background: transparent; color: #e8e8ec;
+  font-size: 13px; font-weight: 500; cursor: pointer; border-radius: 9px;
+  text-align: left; white-space: nowrap;
+}
+.st-yt-dd-opt:hover, .st-yt-dd-opt:focus-visible { background: rgba(255,255,255,.09); color: #fff; outline: none; }
+.st-yt-dd-opt.sel { color: #fff; font-weight: 700; background: rgba(181,74,234,.16); }
 
 /* floating draggable mini-player */
 .st-player.mini-mode {

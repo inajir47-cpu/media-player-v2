@@ -564,6 +564,18 @@
 
   var openDlg = null; // { n, avail, refresh } — refreshed when staged availability resolves
   var lastPlayerProvs = null; // provider list for the in-player server dropdown
+  var histPushed = false; // we own the top history entry while the player is open
+  // Phone/computer back button: minimize instead of leaving while full-screen.
+  window.addEventListener('popstate', function () {
+    var shell = document.querySelector('.st-player');
+    if (shell && !shell.classList.contains('mini-mode')) {
+      try { history.pushState({ playerOpen: true }, ''); } catch (e) {}
+      setMiniMode(shell, true);
+    }
+    // already mini (or no player): browser navigates normally, mini floats on
+  });
+  // one document-level closer for all custom dropdowns (registered once)
+  document.addEventListener('click', function () { closeAllDd(); });
   var lastEmptyToast = 0; // throttle for the no-providers toast in openProviderDialog
   function openProviderDialog(ctx, n, avail) {
     closeDialog();
@@ -654,7 +666,12 @@
     scrim.addEventListener('click', function (e) { if (e.target === scrim) closeDialog(); });
     document.addEventListener('keydown', escClose);
   }
-  function escClose(e) { if (e.key === 'Escape') { closeDialog(); closePlayer(); } }
+  function escClose(e) {
+    if (e.key === 'Escape') {
+      if (document.querySelector('.st-yt-dd.open')) { closeAllDd(); return; }
+      closeDialog(); closePlayer();
+    }
+  }
   function closeDialog() {
     openDlg = null;
     var s = document.querySelector('.st-scrim'); if (s) s.remove();
@@ -679,9 +696,11 @@
       p.remove();
     }
     document.removeEventListener('keydown', escClose);
+    histPushed = false;
   }
 
   function startWatch(ctx, n, prov, lang) {
+    var fresh = !document.querySelector('.st-player');
     var shell = openPlayerShell(ctx, n, prov.name, lang);
     var track = { ctx: ctx, n: n, prov: prov, lang: lang };
     var done = false;
@@ -747,6 +766,10 @@
     shell._ytGoEp = goEp;
     shell._ytNav = { ctx: ctx, n: n, prov: prov, lang: lang, provs: lastPlayerProvs || [prov] };
     buildYtDropdowns(shell);
+    if (fresh && !histPushed) {
+      try { history.pushState({ playerOpen: true }, ''); } catch (e) {}
+      histPushed = true;
+    }
     var prevBtn = shell.querySelector('.st-p-prev');
     var nextBtn = shell.querySelector('.st-p-next');
     if (prevBtn) {
@@ -926,8 +949,7 @@
               '<button class="st-p-btn st-yt-btn st-p-next" type="button" aria-label="Next episode">' + icon('arrowRight') + '</button>') +
             '<button class="st-p-btn st-yt-btn st-p-audio hidden" type="button" aria-label="Audio track">Audio</button>' +
             '<button class="st-p-btn st-yt-btn st-p-subs hidden" type="button" aria-label="Subtitles">Subs</button>' +
-            '<button class="st-p-btn st-yt-btn st-p-mini" type="button" aria-label="Minimize player">' + icon('minimize') + '</button>' +
-            '<button class="st-p-btn st-yt-btn st-p-back" type="button" aria-label="Close player">' + icon('x') + '</button>' +
+            '<button class="st-p-btn st-yt-btn st-p-back" type="button" aria-label="Back">' + icon('minimize') + '</button>' +
           '</div>' +
         '</div>' +
         '<section class="st-yt-reviews" aria-label="Reviews"><div class="st-yt-sec-head"><h3>Reviews</h3></div>' +
@@ -942,7 +964,7 @@
       '</aside>') +
       '<div class="st-p-menu hidden"></div>';
     document.body.appendChild(el);
-    el.querySelector('.st-p-back').addEventListener('click', closePlayer);
+    el.querySelector('.st-p-back').addEventListener('click', function () { setMiniMode(el, true); });
     // floating mini-player bar: play/pause, maximize, close
     var pVideo = el.querySelector('.st-p-video');
     var miniBar = document.createElement('div');
@@ -958,7 +980,6 @@
     ppBtn.addEventListener('click', function () { if (pVideo.paused) pVideo.play(); else pVideo.pause(); });
     pVideo.addEventListener('play', syncPp);
     pVideo.addEventListener('pause', syncPp);
-    el.querySelector('.st-p-mini').addEventListener('click', function () { setMiniMode(el, true); });
     miniBar.querySelector('.st-mini-max').addEventListener('click', function () { setMiniMode(el, false); });
     miniBar.querySelector('.st-mini-x').addEventListener('click', closePlayer);
     makeMiniDraggable(el);
@@ -1074,53 +1095,113 @@
     tick();
   }
 
-  /* ----- YouTube-style: server + audio dropdowns below the player ----- */
-  // Both switch by re-running startWatch — the same code path as the provider
-  // dialog, so error handling and retries behave identically.
+  /* ----- YouTube-style: custom themed server/audio dropdowns ----- */
+  // Native <select> option lists are OS-rendered and unstyleable, so these
+  // are button + popup-list dropdowns in the app's dark glass theme.
+  function closeAllDd() {
+    Array.prototype.forEach.call(document.querySelectorAll('.st-yt-dd.open'), function (w) {
+      if (w._ddClose) w._ddClose();
+    });
+  }
+  function ytDropdown(o) {
+    // o: { label, value, options: [String], onPick(value) }
+    var wrap = document.createElement('div');
+    wrap.className = 'st-yt-dd';
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'st-yt-dd-btn';
+    btn.setAttribute('aria-haspopup', 'listbox');
+    btn.setAttribute('aria-expanded', 'false');
+    btn.setAttribute('aria-label', o.label);
+    var val = document.createElement('span');
+    val.className = 'st-yt-dd-val';
+    val.textContent = o.value;
+    btn.appendChild(val);
+    btn.insertAdjacentHTML('beforeend', icon('chevD'));
+    var list = document.createElement('div');
+    list.className = 'st-yt-dd-list';
+    list.setAttribute('role', 'listbox');
+    list.hidden = true;
+    o.options.forEach(function (opt) {
+      var it = document.createElement('button');
+      it.type = 'button';
+      it.className = 'st-yt-dd-opt' + (opt === o.value ? ' sel' : '');
+      it.setAttribute('role', 'option');
+      it.setAttribute('aria-selected', opt === o.value ? 'true' : 'false');
+      it.textContent = opt;
+      it.addEventListener('click', function () { pick(opt); });
+      list.appendChild(it);
+    });
+    function open() {
+      closeAllDd();
+      list.hidden = false;
+      btn.setAttribute('aria-expanded', 'true');
+      wrap.classList.add('open');
+      var sel = list.querySelector('.sel');
+      if (sel) sel.focus();
+    }
+    function close() {
+      list.hidden = true;
+      btn.setAttribute('aria-expanded', 'false');
+      wrap.classList.remove('open');
+    }
+    function pick(v) {
+      close();
+      if (v === o.value) return;
+      o.value = v; val.textContent = v;
+      Array.prototype.forEach.call(list.children, function (c) {
+        var s = c.textContent === v;
+        c.classList.toggle('sel', s);
+        c.setAttribute('aria-selected', s ? 'true' : 'false');
+      });
+      o.onPick(v);
+    }
+    btn.addEventListener('click', function (e) { e.stopPropagation(); if (list.hidden) open(); else close(); });
+    btn.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { e.stopPropagation(); close(); btn.blur(); }
+      else if ((e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') && list.hidden) {
+        e.preventDefault(); e.stopPropagation(); open();
+      }
+    });
+    list.addEventListener('keydown', function (e) {
+      e.stopPropagation();
+      var items = Array.prototype.slice.call(list.children);
+      var i = items.indexOf(document.activeElement);
+      if (e.key === 'Escape') { close(); btn.focus(); }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); (items[i + 1] || items[0]).focus(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); (items[i - 1] || items[items.length - 1]).focus(); }
+      else if (e.key === 'Enter' && i >= 0) { items[i].click(); }
+    });
+    wrap.appendChild(btn); wrap.appendChild(list);
+    wrap._ddClose = close;
+    return wrap;
+  }
   function buildYtDropdowns(el) {
     var nav = el._ytNav;
     if (!nav) return;
     var wrap = el.querySelector('.st-yt-actions');
     if (!wrap) return;
-    // Server dropdown (only when there is a real choice)
     var provs = nav.provs || [];
     if (provs.length > 1) {
-      var sSel = document.createElement('select');
-      sSel.className = 'st-yt-select';
-      sSel.setAttribute('aria-label', 'Streaming server');
-      provs.forEach(function (p) {
-        var o = document.createElement('option');
-        o.value = p.name; o.textContent = p.name;
-        if (p.name === nav.prov.name) o.selected = true;
-        sSel.appendChild(o);
-      });
-      sSel.addEventListener('change', function () {
-        var np = null;
-        provs.forEach(function (p) { if (p.name === sSel.value) np = p; });
-        if (np && np.name !== nav.prov.name) {
-          var langs = providerLangs(np);
-          var nl = langs.indexOf(nav.lang) >= 0 ? nav.lang : langs[0];
-          startWatch(nav.ctx, nav.n, np, nl);
+      wrap.appendChild(ytDropdown({
+        label: 'Streaming server', value: nav.prov.name,
+        options: provs.map(function (p) { return p.name; }),
+        onPick: function (v) {
+          var np = null;
+          provs.forEach(function (p) { if (p.name === v) np = p; });
+          if (np && np.name !== nav.prov.name) {
+            var langs = providerLangs(np);
+            startWatch(nav.ctx, nav.n, np, langs.indexOf(nav.lang) >= 0 ? nav.lang : langs[0]);
+          }
         }
-      });
-      wrap.appendChild(sSel);
+      }));
     }
-    // Audio / voice dropdown (languages for the current provider)
     var langs = providerLangs(nav.prov);
     if (langs.length > 1) {
-      var lSel = document.createElement('select');
-      lSel.className = 'st-yt-select';
-      lSel.setAttribute('aria-label', 'Audio language');
-      langs.forEach(function (l) {
-        var o = document.createElement('option');
-        o.value = l; o.textContent = l;
-        if (l === nav.lang) o.selected = true;
-        lSel.appendChild(o);
-      });
-      lSel.addEventListener('change', function () {
-        if (lSel.value !== nav.lang) startWatch(nav.ctx, nav.n, nav.prov, lSel.value);
-      });
-      wrap.appendChild(lSel);
+      wrap.appendChild(ytDropdown({
+        label: 'Audio language', value: nav.lang, options: langs,
+        onPick: function (v) { if (v !== nav.lang) startWatch(nav.ctx, nav.n, nav.prov, v); }
+      }));
     }
   }
 

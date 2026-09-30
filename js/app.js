@@ -121,6 +121,7 @@
     arrowRight: '<path d="M5 12h14M13 6l6 6-6 6"/>',
     arrowLeft: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
     chevron: '<path d="m9 5 7 7-7 7"/>',
+    chevD: '<path d="m5 9 7 7 7-7"/>',
     file: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v5h5"/>',
     grid: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
     x: '<path d="M6 6l12 12M18 6 6 18"/>',
