@@ -693,6 +693,11 @@ button.trailer-btn { cursor: pointer; font-family: inherit; }
   .hero-nav { width: 38px; height: 38px; }
 }
 
+/* Touch devices: hide hero carousel arrows (swipe + dots take over). */
+@media (pointer: coarse) {
+  .hero-carousel .hero-nav { display: none; }
+}
+
 /* ---------- rating button + rating/reviews popup ---------- */
 .rating-btn {
   font: inherit; color: #ffd76a; background: rgba(255,215,106,.1);
