@@ -927,28 +927,37 @@
   // parallel (nhentai + Hitomi), the same pair God Mode search uses.
   // No AniList/Jikan/Kitsu call is ever made for this genre.
   function loadHentaiGenre(root, append) {
+    // Hentai genre: videos ONLY (no manga — manga stays in God Mode
+    // search). Page 0 is the curated landing (trending/new/liked);
+    // further pages walk the full catalog via search pagination, so the
+    // grid scrolls infinitely like the normal genre grids.
     var grid = root.querySelector('#genreGrid');
     var sentinel = root.querySelector('#genreSentinel');
-    if (state.loading) return;
-    if (!append) grid.innerHTML = skeletonCards(6);
+    var HP = window.HanimeProvider;
+    if (state.loading || !HP || typeof HP.genre !== 'function') return;
+    if (!append) {
+      grid.innerHTML = skeletonCards(6);
+      state.hentaiPage = 0;
+      state.hentaiSeen = {};
+      state.items = [];
+    }
     state.loading = true;
     if (sentinel) sentinel.classList.add('loading');
-    var jobs = [];
-    if (typeof window.nhSearch === 'function') jobs.push(window.nhSearch('hentai'));
-    if (typeof window.htSearch === 'function') jobs.push(window.htSearch('hentai'));
-    if (typeof window.haSearch === 'function') jobs.push(window.haSearch('hentai'));
-    Promise.all(jobs).then(function (lists) {
+    HP.genre(state.hentaiPage || 0).then(function (res) {
       state.loading = false;
       if (sentinel) sentinel.classList.remove('loading');
       if (!grid.isConnected) return;
-      var items = [];
-      lists.forEach(function (l) { items = items.concat(l || []); });
-      if (!append) state.items = [];
-      state.items = state.items.concat(items);
-      state.hasMore = false; // provider search is single-page; sentinel stays quiet
+      var fresh = [];
+      ((res && res.items) || []).forEach(function (it) {
+        var k = it && it.ref && it.ref.slug;
+        if (k && !state.hentaiSeen[k]) { state.hentaiSeen[k] = 1; fresh.push(it); }
+      });
+      state.items = state.items.concat(fresh);
+      state.hentaiPage = (state.hentaiPage || 0) + 1;
+      state.hasMore = !!(res && res.hasMore);
       grid.innerHTML = state.items.length
         ? state.items.map(godCard).join('')
-        : emptyState('info', 'No titles found', 'The adult provider returned nothing. Try again later.');
+        : emptyState('info', 'No titles found', 'The hanime provider returned nothing. Try again later.');
     }).catch(function (err) {
       state.loading = false;
       if (sentinel) sentinel.classList.remove('loading');

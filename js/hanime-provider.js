@@ -20,6 +20,20 @@
     });
   }
 
+  /* Map one worker result to a God Mode item. */
+  function haItem(r) {
+    return {
+      title: r.name || r.title || r.slug,
+      image: r.poster_url || r.cover_url || '',
+      type: 'video',
+      server: 'hanime',
+      langs: ['Japanese'],
+      audio: [],
+      isAdult: true,
+      ref: { kind: 'hanime', slug: r.slug }
+    };
+  }
+
   /* God Mode search entry: window.haSearch(q), mirroring nhSearch/htSearch. */
   function haSearch(q) {
     q = String(q || '').trim();
@@ -27,20 +41,36 @@
     return haGetJson(HA + '/api/search?q=' + encodeURIComponent(q)).then(function (d) {
       var out = [];
       ((d && d.results) || []).forEach(function (r) {
-        if (!r || !r.slug) return;
-        out.push({
-          title: r.name || r.title || r.slug,
-          image: r.poster_url || r.cover_url || '',
-          type: 'video',
-          server: 'hanime',
-          langs: ['Japanese'],
-          audio: [],
-          isAdult: true,
-          ref: { kind: 'hanime', slug: r.slug }
-        });
+        if (r && r.slug) out.push(haItem(r));
       });
       return out;
     }, function () { return []; });
+  }
+
+  /* Hentai genre browse: page 0 = curated landing (trending/new/liked),
+     page 1+ = full catalog search pages. -> {items, hasMore}. */
+  function haGenre(page) {
+    page = page || 0;
+    if (page === 0) {
+      return haGetJson(HA + '/api/landing').then(function (d) {
+        var out = [], seen = {};
+        ((d && d.sections) || []).forEach(function (s) {
+          ((s && (s.items || s.videos)) || []).forEach(function (r) {
+            if (r && r.slug && !seen[r.slug]) { seen[r.slug] = 1; out.push(haItem(r)); }
+          });
+        });
+        return { items: out, hasMore: out.length > 0 };
+      }, function () { return { items: [], hasMore: false }; });
+    }
+    var sp = page - 1; // search pages are 0-based
+    return haGetJson(HA + '/api/search?q=a&page=' + sp).then(function (d) {
+      var out = [];
+      ((d && d.results) || []).forEach(function (r) {
+        if (r && r.slug) out.push(haItem(r));
+      });
+      var nbPages = (d && d.nbPages) || 0;
+      return { items: out, hasMore: sp + 1 < nbPages };
+    }, function () { return { items: [], hasMore: false }; });
   }
 
   /* Resolve playable streams for a slug -> {title, url, quality} (best first). */
@@ -67,6 +97,7 @@
     id: 'hanime',
     label: 'hanime',
     search: haSearch,
-    video: haVideo
+    video: haVideo,
+    genre: haGenre
   };
 })();

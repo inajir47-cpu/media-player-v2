@@ -729,3 +729,15 @@ Obey this on every update. Updated 2026-09-30.
     queries window.haSearch('hentai'), so hanime videos mix into the same
     grid (cards already render/play via the earlier hanime wiring).
     PUSHED 2026-10-01 ~01:33 +04: origin/main 908ef5d -> 952a0b6 (PAT used transiently, then scrubbed). NOT phone-tested.
+44. 2026-10-01 — Hentai genre: videos-only + infinite scroll (Imran:
+    "need only hentai anime not manga in genres", "loads only 9 and
+    stops", "need infinite scrolling", "takes long to load"). Root causes:
+    the grid queried nhentai+hitomi+haSearch('hentai') — manga included,
+    and q='hentai' only matches 9 titles (nbPages 1), so it stopped.
+    Fix: loadHentaiGenre is now videos-only; new HanimeProvider.genre(page)
+    serves page 0 from /api/landing (trending/new/liked, ~60 curated,
+    ~3s) and pages 1+ from /api/search?q=a (3,418 hits / 143 pages),
+    with slug dedup across pages; state.hasMore drives the existing
+    sentinel observer for infinite scroll. Manga stays in God Mode
+    search. Verified live: 105 unique videos across 3 pages.
+    Committed locally, NOT pushed, NOT phone-tested.
