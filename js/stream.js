@@ -265,7 +265,7 @@
   // runs in a detached slow lane that repaints on completion but never
   // blocks other cards. `done` fires once every lane has settled.
   function checkEpisodeStaged(ctx, n, cb, done) {
-    var avail = { sub: false, dub: false, hindi: false, hindi2: false, zanime: false, servers: [] };
+    var avail = { sub: false, dub: false, hindi: false, hindi2: false, zanime: false, justanime: false, servers: [] };
     var fast = [];
     if (ctx.anilistId) {
       fast.push(enServers(ctx.anilistId, n).then(function (ss) {
@@ -284,6 +284,18 @@
     if (ctx.anilistId && typeof window.zaHasDub === 'function') {
       fast.push(window.zaHasDub(ctx.anilistId, n).then(function (d) {
         if (d) { avail.dub = true; avail.zanime = true; }
+        cb(avail);
+      }, function () { cb(avail); }));
+    }
+    if (ctx.anilistId && typeof window.jaHasEpisode === 'function') {
+      fast.push(window.jaHasEpisode(ctx.anilistId, n).then(function (j) {
+        if (j) { avail.sub = true; avail.justanime = true; }
+        cb(avail);
+      }, function () { cb(avail); }));
+    }
+    if (ctx.anilistId && typeof window.jaHasDub === 'function') {
+      fast.push(window.jaHasDub(ctx.anilistId, n).then(function (j) {
+        if (j) { avail.dub = true; avail.justanime = true; }
         cb(avail);
       }, function () { cb(avail); }));
     }
@@ -327,7 +339,7 @@
     if (openDlg && openDlg.n === n) { try { openDlg.refresh(); } catch (e) {} }
     var old = card.querySelector('.st-badges'); if (old) old.remove();
     var oldG = card.querySelector('.st-globe'); if (oldG) oldG.remove();
-    var hasAny = avail.sub || avail.dub || avail.hindi || avail.hindi2 || avail.zanime;
+    var hasAny = avail.sub || avail.dub || avail.hindi || avail.hindi2 || avail.zanime || avail.justanime;
     // Checks still in flight: paint nothing yet. Final verdict with zero
     // sources: red globe so the dead episode is visible at a glance.
     if (!hasAny && !final) return;
@@ -617,6 +629,7 @@
     if (avail.hindi) out.push({ kind: 'hi', name: 'Hindi', langs: ['Hindi'] });
     if (avail.hindi2) out.push({ kind: 'hi2', name: 'Hindi-2', langs: ['Hindi'] });
     if (avail.zanime) out.push({ kind: 'za', name: 'Z-Anime', langs: ['Japanese', 'English'] });
+    if (avail.justanime) out.push({ kind: 'ja', name: 'JustAnime', langs: ['Japanese', 'English'] });
     return out;
   }
   function providerDesc(p) {
@@ -833,6 +846,15 @@
               encodeURIComponent(r.fileId),
             audioTracks: [], subtitles: [],
             providerLabel: 'Hindi-2 · Rare Animes' };
+        });
+      }
+      if (prov.kind === 'ja') {
+        // JustAnime (Z-Anime Provider 2): senshi API returns a direct HLS
+        // URL; the host is CORS-open so the player loads it as-is.
+        var audio = (lang === 'English') ? 'dub' : 'sub';
+        return window.JustAnimeProvider.watch(ctx.anilistId, n, audio).then(function (w) {
+          return { url: w.url, audioTracks: [], subtitles: w.subtitles || [],
+            providerLabel: 'JustAnime · senshi' };
         });
       }
       if (prov.kind === 'za') {

@@ -674,3 +674,20 @@ Obey this on every update. Updated 2026-09-30.
     .../1/sub, dub probe hits .../1/dub, caches independent, no refetch on
     repeat. Zane's upstream could not be verified from the sandbox (worker
     unreachable from here) — phone test is the verdict. NOT phone-tested.
+39. 2026-10-01 — Added JustAnime provider (Z-Anime Provider 2). Imran asked
+    to reverse-engineer Z-Anime's other providers and add them. RE of the
+    Z-Anime watch-page JS mapped all 5 providers: hianime (ZANE CLOUD),
+    justanime (senshi API — "Ultra fast adfree sub/dub + Hindi"), anilist
+    (10+ subtitles), zplayer (embed, already integrated), mutti (kitty).
+    Only justanime's backend was fully isolated. New js/justanime-provider.js:
+    GET senshi.zanethegodcracker.workers.dev/api/watch/{anilistId}/{sub|dub}/{ep}
+    -> {success, streamUrl, streams[], subtitles/tracks[], intro, outro};
+    Hindi endpoint also documented ({S}/hindi?title=&episode=&season=) but not
+    wired (our Hindi lanes are separate). API + stream host send ACAO:*, so the
+    phone calls them directly. stream.js: JustAnime feeds SUB/DUB badges,
+    appears as its own "JustAnime" provider option, playback hands the direct
+    HLS URL + subtitles to the player. Verified node with stubbed fetch
+    (avail sub/dub, stream fallback streams[0].url, subtitle mapping, session
+    cache) + live senshi responses from sandbox. Permission note: Zane's
+    explicit permission covered the zplayer embed; senshi/justanime workers are
+    his private infra — Imran (co-admin) approved integrating. NOT phone-tested.
