@@ -508,7 +508,7 @@
   /* ---- Character backup source: Jikan lookup by name (used when the
          primary provider fails). Character pages barely change, so they are
          also kept on the device for 7 days — reopening one makes no call. -- */
-  var LS_CHARCACHE = 'mpv2:charcache:v1';
+  var LS_CHARCACHE = 'mpv2:charcache:v2';
   var CHAR_TTL = 7 * 24 * 60 * 60 * 1000;
   function charCacheGet(key) {
     try {
