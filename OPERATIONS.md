@@ -371,6 +371,43 @@ Obey this on every update. Updated 2026-09-30.
     icon/splash generated from `img/movies.png` (best-effort step; the APK
     builds even if icon generation fails). Third-party APIs (TMDB,
     AniList, Jikan, MangaDex) are absolute https URLs — untouched.
+    BUILT 2026-09-30 at Imran's explicit request: workflow run
+    36737927822 succeeded, `Media-Player-V2-2.0.0-debug.apk` (17.2 MB,
+    sha256 `34ebf28a…b948b5`, package `app.mediaplayerv2`) verified —
+    backend `/api/*` calls rewritten to the Render origin (4 files, zero
+    relative leftovers), custom icon present, `sw.js` excluded. Copy in
+    `~/workspace/your_files/media-player-v2-backup/`. NOT phone-tested —
+    only Imran's device counts.
+22. 2026-09-30 — APK streaming fix (Imran reported no provider streaming
+    worked in the APK). Root cause: `js/stream.js` builds backend URLs as
+    `location.origin + '/api/...'`, which resolves to `https://localhost`
+    inside the APK WebView. The workflow now rewrites that form as a
+    single unit FIRST, then standalone `/api/` literals (the first attempt
+    stacked both rewrites and doubled the origin — caught in verification,
+    that build was discarded and never sent to Imran). Commits `d80130b` +
+    `bef4d40`, pushed with a fresh transient PAT (scrubbed after). Imran
+    runs the workflow and downloads the APK from GitHub himself.
+23. 2026-09-30 — Hardware/gesture back-button fix (Imran approved the
+    exact diffs before apply). New `js/back-button.js` exposes
+    `window.__mpv2BackPressed()`: closes the topmost overlay first
+    (`.ext-confirm` → `.md-reader` via `MPV2.MangaReader.close()` →
+    `#moreModal`/`#ratingModal` → any `.st-scrim` by clicking its own
+    `.st-x`, each module's X already wired to its own close fn), then
+    `history.back()` for in-app navigation, then double-press-to-exit
+    with a "Press back again to exit" toast on the root `#/` home.
+    The video player's existing back→mini-player popstate behavior in
+    `stream.js` is deliberately preserved (not closed). `index.html`
+    loads the new file last. The workflow now overwrites the default
+    Capacitor `MainActivity` with one whose `onBackPressed()` asks the
+    JS handler first via `evaluateJavascript`: `'1'` = consumed in-app,
+    `'exit'` = confirmed exit → `finishAffinity()` (avoids the trap where
+    the WebView's own history would navigate back INTO the app instead
+    of exiting), otherwise the default WebView-back/exit. Verified:
+    JS syntax OK, workflow YAML valid, heredoc-extracted Java keeps its
+    `\"` escapes, jsdom 6/6 (overlay closes, reader close, ext-confirm,
+    non-root history.back, root double-press → 'exit'). Website behavior
+    untouched (no native caller there). NOT phone-tested — only Imran's
+    device counts.
 
 ## Standing rules — obey on every update
 

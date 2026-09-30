@@ -56,6 +56,51 @@ jobs:
           rm -f capacitor.config.ts
           npx cap add android
           npx cap sync android
+          # Back button: ask the web app first (close popups / in-app
+          # navigation / double-press-to-exit) instead of the instant exit.
+          cat > android/app/src/main/java/app/mediaplayerv2/MainActivity.java <<'EOF'
+          package app.mediaplayerv2;
+
+          import android.os.Bundle;
+          import android.webkit.WebView;
+          import com.getcapacitor.BridgeActivity;
+          import java.util.concurrent.CountDownLatch;
+          import java.util.concurrent.TimeUnit;
+          import java.util.concurrent.atomic.AtomicReference;
+
+          public class MainActivity extends BridgeActivity {
+              @Override
+              public void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+              }
+
+              @Override
+              public void onBackPressed() {
+                  final AtomicReference<String> res = new AtomicReference<>("0");
+                  final CountDownLatch latch = new CountDownLatch(1);
+                  runOnUiThread(() -> {
+                      try {
+                          WebView wv = getBridge() != null ? getBridge().getWebView() : null;
+                          if (wv != null) {
+                              wv.evaluateJavascript(
+                                  "(function(){try{var r=window.__mpv2BackPressed&&window.__mpv2BackPressed();return r==='exit'?'exit':(r?'1':'0');}catch(e){return '0';}})()",
+                                  v -> {
+                                      res.set(String.valueOf(v).replace("\"", ""));
+                                      latch.countDown();
+                                  });
+                          } else {
+                              latch.countDown();
+                          }
+                      } catch (Exception ignored) { latch.countDown(); }
+                  });
+                  try { latch.await(600, TimeUnit.MILLISECONDS); } catch (InterruptedException ignored) {}
+                  String r = res.get();
+                  if ("1".equals(r)) return;            // consumed in-app
+                  if ("exit".equals(r)) { finishAffinity(); return; } // confirmed exit
+                  super.onBackPressed();                // default: WebView back, else exit
+              }
+          }
+          EOF
           sed -i 's/versionName "1.0"/versionName "2.0.0"/' android/app/build.gradle
           cd android
           chmod +x gradlew
