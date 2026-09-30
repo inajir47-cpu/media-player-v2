@@ -157,13 +157,27 @@
 /* Faded opening-video on the right side of the detail hero card (AnimeThemes,
    like the Konosuba player). The video fades in only once frames are playing;
    a left mask blends it into the card so the poster/title stay readable. */
-.online-detail .detail-hero > :not(.detail-side-video) { position: relative; z-index: 1; }
+.online-detail .detail-hero > :not(.detail-side-video):not(.detail-slideshow) { position: relative; z-index: 1; }
 .detail-side-video { position: absolute; top: 0; right: 0; bottom: 0; width: 58%; height: 100%;
   object-fit: cover; z-index: 0; opacity: 0; transition: opacity 1.4s ease; pointer-events: none;
   -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 42%);
   mask-image: linear-gradient(90deg, transparent 0%, #000 42%);
   filter: brightness(.82) saturate(.92); }
 .online-detail .detail-hero.has-side-video .detail-side-video { opacity: 1; }
+/* Manga page slideshow: dynamic preview banner on the right side of the
+   detail hero (manga has no video trailers). Two layers crossfade on a
+   loop; the container fades in once the first page loads, and a left mask
+   blends it into the card so the poster/title stay readable. */
+.detail-slideshow { position: absolute; top: 0; right: 0; bottom: 0; width: 58%;
+  height: 100%; z-index: 0; opacity: 0; transition: opacity 1.4s ease;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 42%);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 42%);
+  filter: brightness(.82) saturate(.92); }
+.detail-slideshow img { position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; opacity: 0; transition: opacity 1.4s ease; }
+.detail-slideshow img.on { opacity: 1; }
+.online-detail .detail-hero.has-slideshow .detail-slideshow { opacity: 1; }
 
 /* Episode / chapter cards without thumbnails: big ghost number behind the
    shade (the .episode-card system itself lives in pages.css). */

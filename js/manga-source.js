@@ -69,9 +69,23 @@
    * chapter numbers exist in the EN / JA MangaDex feeds. In-memory cached
    * per uuid for the session. */
   var langAvailCache = {};
+  /* Raw sorted feed entries (with chapter IDs) for the detail slideshow.
+   * Shares the session cache with langAvailability so the EN feed is only
+   * downloaded once no matter which feature asks first. */
+  var feedEntriesCache = {};
+  function feedEntries(uuid, lang) {
+    var k = uuid + ':' + lang;
+    if (feedEntriesCache[k]) return Promise.resolve(feedEntriesCache[k]);
+    return feedSorted(uuid, lang).then(function (sorted) {
+      feedEntriesCache[k] = sorted;
+      return sorted;
+    });
+  }
   function langAvailability(uuid) {
     if (langAvailCache[uuid]) return Promise.resolve(langAvailCache[uuid]);
     return Promise.all([feedSorted(uuid, 'en'), feedSorted(uuid, 'ja')]).then(function (feeds) {
+      feedEntriesCache[uuid + ':en'] = feeds[0];
+      feedEntriesCache[uuid + ':ja'] = feeds[1];
       function numSet(sorted) {
         var s = {};
         (sorted || []).forEach(function (c) { s[String(c.ch)] = 1; });
@@ -265,6 +279,7 @@
     openSourceDialog: openSourceDialog,
     openChapter: openChapter,
     langAvailabilityFor: langAvailabilityFor,
+    feedEntries: feedEntries,
     closeDialog: closeDialog
   };
 })();

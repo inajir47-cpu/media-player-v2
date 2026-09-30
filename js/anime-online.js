@@ -1244,6 +1244,76 @@
     });
   }
 
+  // Manga page slideshow: dynamic preview banner for the detail header.
+  // Manga has no video trailers, so cycle a few pages of the first EN
+  // chapter in a fading loop on the right side of the hero card (the same
+  // spot as the anime opening video). Any failure -> no container, and the
+  // static banner/poster underneath shows (graceful fallback).
+  function mountMangaSlideshow(mount, d) {
+    if ((d.mediaType || '') !== 'MANGA' || !detailVideoAllowed()) return;
+    var MS = window.MPV2 && window.MPV2.MangaSource;
+    var MR = window.MPV2 && window.MPV2.MangaReader;
+    var A = window.MPV2 && window.MPV2.AnimeAPI;
+    if (!MS || !MR || !A || typeof A.mdMangaUuid !== 'function' ||
+        typeof MS.feedEntries !== 'function' || typeof MR.chapterPages !== 'function') return;
+    var hero = mount.querySelector('header.detail-hero');
+    if (!hero || hero.querySelector('.detail-slideshow') ||
+        hero.getAttribute('data-slideshow') === '1') return;
+    hero.setAttribute('data-slideshow', '1');
+    function abandon() { hero.removeAttribute('data-slideshow'); }
+    A.mdMangaUuid(d.malId || null, d.title || '').then(function (uuid) {
+      if (!uuid || !hero.isConnected) { abandon(); return null; }
+      return MS.feedEntries(uuid, 'en');
+    }).then(function (feed) {
+      if (!feed || !feed.length || !hero.isConnected) { abandon(); return null; }
+      return MR.chapterPages(feed[0].id);
+    }).then(function (urls) {
+      if (!hero.isConnected || !urls || !urls.length) { abandon(); return; }
+      // Preload the first pages; keep only the ones that actually load.
+      var cands = urls.slice(0, 5), pending = cands.length, good = [];
+      cands.forEach(function (u) {
+        var im = new Image();
+        im.onload = function () { good.push(u); if (!--pending) start(good); };
+        im.onerror = function () { if (!--pending) start(good); };
+        im.src = u;
+      });
+    }).catch(function () { abandon(); /* static banner/poster stays */ });
+
+    function start(good) {
+      if (!good.length || !hero.isConnected) { abandon(); return; }
+      var box = document.createElement('div');
+      box.className = 'detail-slideshow';
+      box.setAttribute('aria-hidden', 'true');
+      var layers = [0, 1].map(function () {
+        var im = document.createElement('img');
+        im.alt = '';
+        box.appendChild(im);
+        return im;
+      });
+      hero.insertBefore(box, hero.firstChild);
+      var cur = 0, idx = 0;
+      layers[0].src = good[0]; // cached from preload: instant
+      layers[0].onload = function () {
+        if (!box.isConnected) return;
+        layers[0].classList.add('on');
+        hero.classList.add('has-slideshow');
+      };
+      if (good.length < 2) return; // single page: static preview, no loop
+      var timer = setInterval(function () {
+        if (!box.isConnected) { clearInterval(timer); return; }
+        idx = (idx + 1) % good.length;
+        var next = layers[(cur + 1) % 2];
+        next.onload = function () {
+          if (!box.isConnected) { clearInterval(timer); return; }
+          layers[cur].classList.remove('on');
+          next.classList.add('on');
+          cur = (cur + 1) % 2;
+        };
+        next.src = good[idx];
+      }, 4000);
+    }
+  }
+
   // Manga smart Read button: mutually exclusive with the resume state.
   // No history -> "Read" (opens the source dialog). Has history ->
   // "Continue Ch N" (opens the reader directly at that chapter).
@@ -1310,6 +1380,7 @@
       });
       tintFromPoster(mount, d.image);
       mountDetailVideo(mount, d, mediaType);
+      mountMangaSlideshow(mount, d);
       mountEpList(mount, provider, id, d, (d.mediaType || mediaType) === 'MANGA');
       mountRecommendations(mount, provider, id, d, (d.mediaType || mediaType));
       whenStreamReady(function (S) { S.wireDetail(mount, provider, id, d, mediaType); });
