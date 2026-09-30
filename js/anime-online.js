@@ -268,31 +268,33 @@
   }
 
   /* --------------------- Recently viewed (detail pages) --------------------- */
-  // Last 10 anime/movie/OVA detail pages the user opened. Manga is strictly
-  // excluded. Device-local localStorage, most-recent first.
+  // Last 10 anime/movie/OVA detail pages the user opened (mpv2_recently_viewed_v1)
+  // and last 10 manga detail pages (mpv2_recently_viewed_manga_v1), kept apart
+  // so each lives on its own tab. Device-local localStorage, most-recent first.
   var LS_RECENT_VIEWED = 'mpv2_recently_viewed_v1';
-  function getRecentlyViewed() {
+  var LS_RECENT_VIEWED_MANGA = 'mpv2_recently_viewed_manga_v1';
+  function getRecentlyViewed(manga) {
     try {
-      var v = JSON.parse(localStorage.getItem(LS_RECENT_VIEWED));
+      var v = JSON.parse(localStorage.getItem(manga ? LS_RECENT_VIEWED_MANGA : LS_RECENT_VIEWED));
       return Array.isArray(v) ? v : [];
     } catch (e) { return []; }
   }
   function recordView(d, provider, id, mediaType) {
     if (!d || !d.title) return;
     var mt = d.mediaType || mediaType || '';
-    if (mt === 'MANGA') return;
+    var isManga = (mt === 'MANGA');
     var key = provider + ':' + id;
     var entry = {
       provider: provider, id: id, title: d.title, image: d.image || '',
       mediaType: mt, format: d.format || '',
-      href: '#/' + SEC_ID + '/online/' + provider + '/' + id,
+      href: '#/' + SEC_ID + '/online/' + provider + '/' + (isManga ? 'manga/' : '') + id,
       viewedAt: Date.now()
     };
-    var list = getRecentlyViewed().filter(function (e) {
+    var list = getRecentlyViewed(isManga).filter(function (e) {
       return e && (e.provider + ':' + e.id) !== key;
     });
     list.unshift(entry);
-    try { localStorage.setItem(LS_RECENT_VIEWED, JSON.stringify(list.slice(0, 10))); } catch (e) {}
+    try { localStorage.setItem(isManga ? LS_RECENT_VIEWED_MANGA : LS_RECENT_VIEWED, JSON.stringify(list.slice(0, 10))); } catch (e) {}
   }
 
   /* -------------------------- Recommendations --------------------------- */
@@ -319,6 +321,22 @@
     }).join('');
     return '<section class="online-block" id="recentlyViewedBlock"><div class="online-head">' +
       '<div><h2>Recently Viewed</h2><p class="online-sub">Pick up where you left off</p></div>' +
+      '</div><div class="poster-row">' + cards + '</div></section>';
+  }
+
+  // "Recently Viewed Manga" row for the Manga tab: last 10 manga detail
+  // pages the user opened. Hidden entirely when there is no history yet.
+  function recentlyViewedMangaHtml() {
+    var list = getRecentlyViewed(true);
+    if (!list.length) return '';
+    var cards = list.map(function (v) {
+      return '<a class="poster-card online-card" href="' + esc(v.href) + '">' +
+        '<span class="poster-img"><img src="' + esc(v.image) + '" alt="' + esc(v.title) +
+        ' poster" loading="lazy"></span>' +
+        '<span class="poster-title">' + esc(v.title) + '</span></a>';
+    }).join('');
+    return '<section class="online-block" id="recentlyViewedMangaBlock"><div class="online-head">' +
+      '<div><h2>Recently Viewed Manga</h2><p class="online-sub">Continue your reads</p></div>' +
       '</div><div class="poster-row">' + cards + '</div></section>';
   }
 
@@ -884,7 +902,7 @@
     return '<section class="row online-discover-block" id="mangaBlock">' +
       '<div class="row-head"><h2>Manga</h2>' +
       '<span class="muted-link">Live rankings · ' + esc(providerName()) + '</span></div>' +
-      '<div class="online-wrap">' + recoHtml() + top10Html() + genreHtml() + '</div></section>';
+      '<div class="online-wrap">' + recoHtml() + recentlyViewedMangaHtml() + top10Html() + genreHtml() + '</div></section>';
   };
 
   window.MPV2.mountMangaBlock = function (sec, root) {

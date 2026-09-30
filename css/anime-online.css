@@ -32,7 +32,22 @@
     -webkit-text-stroke: 1.5px var(--tone);
   }
 }
-.top10-title .t-solid { color: var(--text); }
+.top10-title .t-solid { color: var(--text); } /* fallback: solid bold */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .top10-title .t-solid {
+    /* stencil slash-cuts: horizontal slits through the digits */
+    color: transparent;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--text) 0,
+      var(--text) 0.22em,
+      transparent 0.22em,
+      transparent 0.3em
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+}
 /* TOP 010 auto-carousel viewport: desktop/tablet show 3 rows and scroll
    vertically; phones show 1 card (2 on wider phones) and scroll
    horizontally. Scrollbars hidden — wheel / touch / drag still scroll. */
