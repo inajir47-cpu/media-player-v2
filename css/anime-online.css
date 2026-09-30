@@ -213,7 +213,7 @@ button.trailer-btn { cursor: pointer; font-family: inherit; }
 /* Watch history: Play + Save-to-Watchlist row on the detail page */
 .wh-row { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
 .wh-play { display: inline-flex; align-items: center; gap: 8px; border: 0; cursor: pointer;
-  font-family: inherit; font-weight: 800; font-size: 15px; color: #fff;
+  font-family: inherit; font-weight: 800; font-size: 15px; color: #fff; white-space: nowrap;
   background: var(--tone); padding: 12px 26px; border-radius: 999px;
   box-shadow: 0 6px 22px color-mix(in srgb, var(--tone) 50%, transparent); }
 .wh-play .icon { width: 18px; height: 18px; }
