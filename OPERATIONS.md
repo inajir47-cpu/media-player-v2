@@ -12,6 +12,7 @@ Obey this on every update. Updated 2026-09-30.
 | Cloudflare Worker (`mpv2-hls-proxy.gmpdi020.workers.dev`) | HLS proxy + upstream fetcher for the phone | Free tier — 100,000 requests/day |
 | TMDB | Episode stills metadata | Free, but needs **Imran's own API key** (slot is built in Settings; key not yet added) |
 | AniList / TVmaze / Jikan | Anime metadata (titles, images, episode lists) | Free, no keys needed |
+| MangaDex | Manga chapter feeds (EN/JA) + at-home page images | Keyless. Treated limit: 5 requests/second (feeds serialize with a 300ms floor; page URLs cached in memory). Direct-first JSON with Cloudflare Worker fallback for CORS. Pages load from the MangaDex CDN. Title and language coverage varies by title (Japanese depends on what scanlators uploaded). |
 | reanime.to + flixcloud.cc | English sub/dub streams (HD-1, HD-2 providers) | Not ours — can break or block us anytime |
 | ToonStream → TurboNewVid → RubySTM → VidMoly | Hindi streams (Hindi provider) | Not ours — can break anytime |
 | codedew.com + rareamimes.mov | Hindi-2 streams (Rare Animes India) | Not ours — can break anytime |
