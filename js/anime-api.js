@@ -71,7 +71,7 @@
   var AL = 'https://graphql.anilist.co';
   var AL_ITEM = 'id title{romaji english} coverImage{large extraLarge} bannerImage ' +
     'averageScore popularity genres status format startDate{year} episodes chapters volumes ' +
-    'description(asHtml:false) trailer{id site}';
+    'description(asHtml:false) trailer{id site} isAdult';
 
   function alQuery(query, variables) {
     return fetch(AL, {
@@ -102,7 +102,8 @@
       episodes: m.episodes || null,
       chapters: m.chapters || null, volumes: m.volumes || null,
       synopsis: (m.description || '').replace(/<[^>]*>/g, '').trim(),
-      trailerYoutube: (m.trailer && m.trailer.site === 'youtube') ? m.trailer.id : null
+      trailerYoutube: (m.trailer && m.trailer.site === 'youtube') ? m.trailer.id : null,
+      isAdult: !!m.isAdult
     };
   }
 
@@ -349,7 +350,8 @@
       chapters: a.chapters || null, volumes: a.volumes || null,
       mediaType: type === 'MANGA' ? 'MANGA' : 'ANIME',
       synopsis: (a.synopsis || '').replace(/\[Written by MAL Rewrite\]\s*/g, '').trim(),
-      trailerYoutube: (a.trailer && a.trailer.youtube_id) || null
+      trailerYoutube: (a.trailer && a.trailer.youtube_id) || null,
+      isAdult: /^Rx/i.test(a.rating || '') // MAL "Rx - Hentai" rating
     };
   }
 
@@ -606,7 +608,8 @@
       chapters: a.chapterCount || null, volumes: a.volumeCount || null,
       mediaType: mt,
       synopsis: a.synopsis || '',
-      trailerYoutube: a.youtubeVideoId || null
+      trailerYoutube: a.youtubeVideoId || null,
+      isAdult: !!a.nsfw
     };
   }
 

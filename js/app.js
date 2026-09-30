@@ -154,8 +154,8 @@
   }
 
   function getSettings() {
-    try { return Object.assign({ autoplay: true, compact: false, reduce: false }, JSON.parse(localStorage.getItem(LS_SETTINGS) || '{}')); }
-    catch (e) { return { autoplay: true, compact: false, reduce: false }; }
+    try { return Object.assign({ autoplay: true, compact: false, reduce: false, adult: false }, JSON.parse(localStorage.getItem(LS_SETTINGS) || '{}')); }
+    catch (e) { return { autoplay: true, compact: false, reduce: false, adult: false }; }
   }
   function saveSettings(s) {
     try { localStorage.setItem(LS_SETTINGS, JSON.stringify(s)); } catch (e) {}
@@ -1682,6 +1682,9 @@
       '<div class="settings">' +
         '<section class="settings-group"><h2>Playback</h2>' +
           row('autoplay', 'Autoplay previews', 'Play muted previews on poster hover.') +
+        '</section>' +
+        '<section class="settings-group"><h2>Content</h2>' +
+          row('adult', 'Show adult (18+) titles', 'Include 18+ titles in search and details. Details only — no streams or chapters.') +
         '</section>' +
         '<section class="settings-group"><h2>Section theme</h2>' +
           '<div class="theme-block">' +

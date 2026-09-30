@@ -279,6 +279,7 @@
 
   function onlineCard(item) {
     var meta = [item.year || '', formatLabel(item), countLabel(item)].filter(Boolean).join(' · ');
+    var adultBadge = item.isAdult ? '<span class="adult18 on-poster">18+</span>' : '';
     // Opening-theme preview on hover (desktop) / long-press (touch). Manga has no OP.
     var opAttrs = (item.mediaType !== 'MANGA' && item.provider && item.id)
       ? ' data-op-provider="' + item.provider + '" data-op-id="' + item.id + '"' : '';
@@ -286,7 +287,7 @@
       ? '<video class="op-preview" muted loop playsinline preload="none" aria-hidden="true"></video>' : '';
     return '<a class="poster-card online-card" href="' + detailPath(item) + '"' + opAttrs + '>' +
       '<span class="poster-img"><img src="' + esc(item.image) + '" alt="' + esc(item.title) +
-      ' poster" loading="lazy">' + posterScore(item) + opVideo + '</span>' +
+      ' poster" loading="lazy">' + posterScore(item) + adultBadge + opVideo + '</span>' +
       '<span class="poster-title">' + esc(item.title) + '</span>' +
       '<span class="poster-meta">' + esc(meta) + '</span></a>';
   }
@@ -889,7 +890,11 @@
   // default Search tab (#/animation/search).
 
   function searchResultsHtml(q, res) {
-    var a = res.anime || [], m = res.manga || [];
+    var allowAdult = adultAllowed();
+    function visible(list) {
+      return (list || []).filter(function (it) { return allowAdult || !it.isAdult; });
+    }
+    var a = visible(res.anime), m = visible(res.manga);
     if (!a.length && !m.length)
       return emptyState('search', 'No results', 'Try a different title.');
     return '<div class="online-search-head"><h3>Results for &ldquo;' + esc(q) + '&rdquo;</h3></div>' +
@@ -1220,6 +1225,22 @@
     return true;
   }
 
+  // Adult (18+) titles: AniList-style opt-in. Details only — no streams,
+  // no chapters — and hidden from search until the user enables them.
+  function adultAllowed() {
+    try { return !!JSON.parse(localStorage.getItem('mpv2_settings_v1') || '{}').adult; }
+    catch (e) { return false; }
+  }
+
+  // 18+ gate body: shown instead of the detail page when an adult title is
+  // opened while the Settings opt-in is off.
+  function adultGateHtml(d) {
+    return '<div class="adult-gate"><span class="adult18 big">18+</span>' +
+      '<h2>' + esc(d.title || 'Adult title') + '</h2>' +
+      '<p>This is an 18+ title. Its details are hidden until you enable them.</p>' +
+      '<p class="dim">Animation &rarr; Settings &rarr; Content &rarr; Show adult (18+) titles.</p></div>';
+  }
+
   // Faded, muted, looping opening video on the right side of the detail hero
   // card — the same placement as the Konosuba player's trailer layer.
   function mountDetailVideo(mount, d, mediaType) {
@@ -1370,6 +1391,13 @@
     window.scrollTo(0, 0);
     API().detail(provider, id, mediaType).then(function (d) {
       document.title = d.title + ' · ' + sec.name + ' · Media Player V2';
+      // 18+ gate (AniList-style): metadata sits behind the Settings opt-in.
+      if (d.isAdult && !adultAllowed()) {
+        mount.innerHTML = pageHead(sec, 'Details', 'Adult title.') +
+          '<div class="online-wrap">' + adultGateHtml(d) + '</div>';
+        window.scrollTo(0, 0);
+        return;
+      }
       mount.innerHTML = detailHtml(sec, d, mediaType);
       lastDetail = d; lastDetailProvider = provider;
       recordView(d, provider, id, mediaType);
@@ -1441,7 +1469,9 @@
         '<span>Watch Order</span></button>' : '';
     // Chunk 2 (manga): prominent globe in the header action row — opens the
     // manga source/provider dialog, mirroring the anime streaming flow.
-    var readBtn = isManga
+    // No Read button for 18+ manga: MangaDex carries no adult content, so
+    // reading would be a dead end; details are shown instead.
+    var readBtn = (isManga && !d.isAdult)
       ? '<button class="trailer-btn" data-md-read aria-label="Read manga">' + icon('book') +
         '<span>Read</span></button>' : '';
     var coming = d.startTs && d.startTs > Date.now()
@@ -1483,7 +1513,8 @@
         '<header class="detail-hero"><span class="poster-img big"><img src="' + esc(d.image) +
           '" alt="' + esc(d.title) + ' poster"></span>' +
         '<div class="detail-copy"><p class="detail-kicker">' + esc(providerName()) + '</p>' +
-          '<h1>' + esc(d.title) + '</h1><p class="detail-meta">' + esc(meta) +
+          '<h1>' + esc(d.title) + '</h1>' + (d.isAdult ? '<span class="adult18">18+</span>' : '') +
+          '<p class="detail-meta">' + esc(meta) +
             (ratingBtn ? ' · ' + ratingBtn : '') + '</p>' +
           studios +
           '<div class="genre-tags">' + (d.genres || []).map(function (g) {
@@ -1530,6 +1561,10 @@
   // Long lists (e.g. 1100+ episodes) are a horizontal slide strip: swipe
   // sideways, more pages load as you near the right end.
   function epListPlaceholder(d, isManga) {
+    // 18+ manga: no chapter sources carry adult content — details only.
+    if (isManga && d.isAdult)
+      return '<section class="online-block"><div class="ep-head-row"><h2>Chapters</h2></div>' +
+        '<p class="muted-note">Chapter reading isn\'t available for 18+ titles &mdash; details only.</p></section>';
     if (!isManga && d.episodes === 1) return movieRowHtml(d);
     var kind = isManga ? 'ch' : 'ep';
     return '<section class="online-block" data-' + kind + '-block hidden>' +
