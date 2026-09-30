@@ -592,6 +592,7 @@
         '<button class="st-start" type="button">Start Watching</button>' +
       '</div>';
     document.body.appendChild(scrim);
+    if (window.MPV2 && window.MPV2.lockBodyScroll) window.MPV2.lockBodyScroll();
     var provBox = scrim.querySelector('.st-provs');
     var langBox = scrim.querySelector('.st-langs');
     var startBtn = scrim.querySelector('.st-start');
@@ -655,6 +656,7 @@
   function closeDialog() {
     openDlg = null;
     var s = document.querySelector('.st-scrim'); if (s) s.remove();
+    if (window.MPV2 && window.MPV2.unlockBodyScroll) window.MPV2.unlockBodyScroll();
     document.removeEventListener('keydown', escClose);
   }
 

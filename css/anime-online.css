@@ -443,6 +443,11 @@ button.trailer-btn { cursor: pointer; font-family: inherit; }
   .top10-row, .pill, .chip { transition: none; }
 }
 
+/* Keep scroll gestures inside open dialogs: no chaining to the background. */
+.st-dialog, .rv-dialog, .wo-overlay, .more-sheet {
+  overscroll-behavior: contain;
+}
+
 /* rating chip overlaid on every online poster: frosted-glass badge */
 .poster-score {
   position: absolute; top: 8px; left: 8px; z-index: 2;

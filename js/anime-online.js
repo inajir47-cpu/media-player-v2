@@ -26,6 +26,21 @@
   // and character popups (all prefetched when the detail page loads).
   var lastDetail = null, lastDetailProvider = null;
 
+  // Body scroll lock, reference-counted so stacked popups can't unlock the
+  // background while another popup is still open.
+  var bodyLockCount = 0;
+  function lockBodyScroll() {
+    bodyLockCount++;
+    document.body.style.overflow = 'hidden';
+  }
+  function unlockBodyScroll() {
+    bodyLockCount = Math.max(0, bodyLockCount - 1);
+    if (bodyLockCount === 0) document.body.style.overflow = '';
+  }
+  // Shared with stream.js (provider chooser) and app.js (rating/cast modals).
+  window.MPV2.lockBodyScroll = lockBodyScroll;
+  window.MPV2.unlockBodyScroll = unlockBodyScroll;
+
   // Generic bottom-sheet modal. Reuses the .st-scrim/.st-dialog dialog chrome
   // from the provider chooser so popups look consistent.
   function openPopup(title, sub, bodyHtml) {
@@ -42,6 +57,7 @@
         '<div class="rv-body">' + bodyHtml + '</div>' +
       '</div>';
     document.body.appendChild(scrim);
+    lockBodyScroll();
     function onKey(e) { if (e.key === 'Escape') closePopup(); }
     scrim.addEventListener('click', function (e) { if (e.target === scrim) closePopup(); });
     scrim.querySelector('.st-x').addEventListener('click', closePopup);
@@ -55,6 +71,7 @@
       var scrim = s.parentElement;
       if (scrim && scrim._onKey) document.removeEventListener('keydown', scrim._onKey);
       if (scrim) scrim.remove();
+      unlockBodyScroll();
     }
   }
 
@@ -1749,7 +1766,7 @@
       '<button class="wo-close" data-wo-close aria-label="Close">' + icon('x') + '</button></div>' +
       next + '<div class="wo-list">' + rows + '</div></div>';
     document.body.appendChild(ov);
-    document.body.style.overflow = 'hidden';
+    lockBodyScroll();
     ov.addEventListener('click', function (ev) {
       // Backdrop / X closes; tapping a title row navigates AND closes.
       if (ev.target === ov || ev.target.closest('[data-wo-close]') ||
@@ -1761,7 +1778,7 @@
   function closeWatchOrder() {
     var ov = document.querySelector('[data-wo-overlay]');
     if (ov) ov.remove();
-    document.body.style.overflow = '';
+    unlockBodyScroll();
   }
   document.addEventListener('keydown', function (ev) {
     if (ev.key === 'Escape') closeWatchOrder();

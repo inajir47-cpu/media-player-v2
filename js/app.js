@@ -750,7 +750,8 @@
   function closeMoreModal() {
     var ov = document.getElementById('moreModal');
     if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
-    document.body.style.overflow = '';
+    if (window.MPV2 && window.MPV2.unlockBodyScroll) window.MPV2.unlockBodyScroll();
+    else document.body.style.overflow = '';
     if (moreReturnFocus && moreReturnFocus.focus) {
       try { moreReturnFocus.focus(); } catch (e) {}
       moreReturnFocus = null;
@@ -807,7 +808,8 @@
   function closeRatingModal() {
     var ov = document.getElementById('ratingModal');
     if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
-    document.body.style.overflow = '';
+    if (window.MPV2 && window.MPV2.unlockBodyScroll) window.MPV2.unlockBodyScroll();
+    else document.body.style.overflow = '';
     if (ratingReturnFocus && ratingReturnFocus.focus) {
       try { ratingReturnFocus.focus(); } catch (e) {}
       ratingReturnFocus = null;
@@ -833,7 +835,8 @@
     });
     ratingReturnFocus = document.activeElement;
     document.body.appendChild(ov);
-    document.body.style.overflow = 'hidden';
+    if (window.MPV2 && window.MPV2.lockBodyScroll) window.MPV2.lockBodyScroll();
+    else document.body.style.overflow = 'hidden';
     var btn = ov.querySelector('.more-close');
     if (btn) btn.focus();
   }
@@ -871,7 +874,8 @@
     });
     moreReturnFocus = document.activeElement;
     document.body.appendChild(ov);
-    document.body.style.overflow = 'hidden';
+    if (window.MPV2 && window.MPV2.lockBodyScroll) window.MPV2.lockBodyScroll();
+    else document.body.style.overflow = 'hidden';
     var sheet = ov.querySelector('.more-sheet');
     if (sheet) sheet.scrollTop = 0;
     var btn = ov.querySelector('.more-close');
