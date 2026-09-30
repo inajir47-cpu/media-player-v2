@@ -741,3 +741,20 @@ Obey this on every update. Updated 2026-09-30.
     sentinel observer for infinite scroll. Manga stays in God Mode
     search. Verified live: 105 unique videos across 3 pages.
     Committed locally, NOT pushed, NOT phone-tested.
+45. 2026-10-01 — hanime details page (Imran: "what about their details
+    page", approved "BUILD it"). Tapping a hanime card (genre grid or God
+    Mode search) now opens #/animation/online/hanime/{slug} instead of
+    jumping straight to the player. New renderHanimeDetail in
+    js/anime-online.js (intercepted in renderOnlineDetail, outside the
+    AniList/Jikan/Kitsu pipeline): poster header with title/brand/stats
+    (views, likes, best quality, year), Play button, About section, tag
+    chips (up to 20), and "More from {brand}" row from the franchise list.
+    Same 18+ rules as adult AniList titles: metadata behind the Settings
+    opt-in, warning modal on every open, Recently Viewed logged only on
+    Proceed. New HanimeProvider.full(slug) returns {video, franchise,
+    streams}. godRecordView gained the hanime branch (details href).
+    Reuses the real detail-page CSS classes (detail-hero, poster-img big,
+    detail-copy, rel-strip, etc.). Verified jsdom with live worker data:
+    title/meta/tags(16)/related(10)/play/back all render; rel links point
+    at the hanime detail route. Committed locally, NOT pushed, NOT
+    phone-tested.

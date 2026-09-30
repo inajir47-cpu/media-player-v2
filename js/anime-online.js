@@ -1293,9 +1293,12 @@
     } else if (kind === 'nhentai' || kind === 'hitomi') {
       id = card.getAttribute(kind === 'nhentai' ? 'data-god-nhid' : 'data-god-hitomi') || title;
       mediaType = 'MANGA';
+    } else if (kind === 'hanime') {
+      id = card.getAttribute('data-god-hslug') || title;
+      href = '#/' + SEC_ID + '/online/hanime/' + encodeURIComponent(id);
     } else { return; }
     recordView({ title: title, image: image, mediaType: mediaType, href: href,
-                 isAdult: (kind === 'nhentai' || kind === 'hitomi') },
+                 isAdult: (kind === 'nhentai' || kind === 'hitomi' || kind === 'hanime') },
                provider, id, mediaType);
   }
   // Strip Hindi-provider suffixes so the AniList match runs on the core title.
@@ -1471,19 +1474,11 @@
         }).catch(function () { if (window.MPV2.toast) window.MPV2.toast('Could not open this gallery.'); });
       });
     } else if (kind === 'hanime') {
-      // hanime video: 18+ safety warning every time (same as adult AniList
-      // titles), then straight into the video player with the resolved m3u8.
+      // hanime video: open the details page (same 18+ warning flow as
+      // adult AniList titles, handled by renderOnlineDetail).
       var haslug = card.getAttribute('data-god-hslug');
-      var hat = card.getAttribute('data-god-title') || 'hanime video';
-      var HP = window.HanimeProvider;
-      var ST = window.MPV2 && window.MPV2.Stream;
-      if (!haslug || !HP || !ST || typeof ST.playHanime !== 'function') return;
-      adultWarnModal({ title: hat }, function () {
-        godRecordView(card, kind); // log only on Proceed, not on tap
-        if (window.MPV2.toast) window.MPV2.toast('Loading video\u2026');
-        var haimg = card.querySelector('img');
-        ST.playHanime(haslug, hat, haimg ? (haimg.getAttribute('src') || '') : '');
-      });
+      if (!haslug) return;
+      location.hash = '#/' + SEC_ID + '/online/hanime/' + encodeURIComponent(haslug);
     }
   }
 
@@ -1876,6 +1871,9 @@
   window.MPV2.renderOnlineDetail = function (sectionId, provider, id, mediaType) {
     var sec = window.MPV2.SECTIONS[sectionId] || window.MPV2.SECTIONS[SEC_ID];
     var mount = document.querySelector('#view') || document.querySelector('#app');
+    // hanime videos have their own details page (worker metadata), outside
+    // the AniList/Jikan/Kitsu adapter pipeline.
+    if (provider === 'hanime') { renderHanimeDetail(sec, mount, id); return; }
     document.title = 'Loading… · ' + sec.name + ' · Media Player V2';
     mount.innerHTML = pageHead(sec, 'Loading', 'Fetching title details…') +
       '<div class="online-wrap">' + skeletonCards(3) + '</div>';
@@ -1927,6 +1925,111 @@
       });
     });
   };
+
+  /* ------------------------- hanime details page --------------------------- */
+  // Dedicated details page for hanime videos: poster header, stats,
+  // description, tags, Play button, and a "more from this brand" row.
+  // Same 18+ rules as adult AniList titles: metadata sits behind the
+  // Settings opt-in, and even opted-in the warning modal asks first.
+  function renderHanimeDetail(sec, mount, slug) {
+    var HP = window.HanimeProvider;
+    document.title = 'Loading… · ' + sec.name + ' · Media Player V2';
+    mount.innerHTML = pageHead(sec, 'Loading', 'Fetching title details…') +
+      '<div class="online-wrap">' + skeletonCards(3) + '</div>';
+    window.scrollTo(0, 0);
+    if (!HP || typeof HP.full !== 'function') {
+      mount.innerHTML = pageHead(sec, 'Details', 'Something went wrong.') +
+        '<div class="online-wrap">' + errorHtml(new Error('hanime provider not loaded')) + '</div>';
+      return;
+    }
+    function body(d) {
+      var v = d.video || {};
+      document.title = (v.name || 'Video') + ' · ' + sec.name + ' · Media Player V2';
+      mount.innerHTML = hanimeDetailHtml(sec, d, slug);
+      recordView({ title: v.name || slug, image: v.poster_url || '', isAdult: true,
+        href: '#/' + SEC_ID + '/online/hanime/' + encodeURIComponent(slug) }, 'hanime', slug, '');
+      tintFromPoster(mount, v.poster_url, v.name);
+      var play = mount.querySelector('[data-hanime-play]');
+      if (play) play.addEventListener('click', function () {
+        var ST = window.MPV2 && window.MPV2.Stream;
+        if (ST && typeof ST.playHanime === 'function')
+          ST.playHanime(slug, v.name || slug, v.poster_url || '');
+      });
+      window.scrollTo(0, 0);
+    }
+    HP.full(slug).then(function (d) {
+      if (!d || !d.video || !d.video.slug) throw new Error('Video not found');
+      var v = d.video;
+      if (!adultAllowed()) {
+        mount.innerHTML = pageHead(sec, 'Details', 'Adult title.') +
+          '<div class="online-wrap">' + adultGateHtml({ title: v.name }) + '</div>';
+        window.scrollTo(0, 0);
+        return;
+      }
+      adultWarnModal({ title: v.name }, function () { body(d); });
+    }).catch(function (err) {
+      mount.innerHTML = pageHead(sec, 'Details', 'Something went wrong.') +
+        '<div class="online-wrap">' + errorHtml(err) + '</div>';
+      mount.addEventListener('click', function (e) {
+        if (e.target.closest('[data-retry]'))
+          window.MPV2.renderOnlineDetail('animation', 'hanime', slug);
+      });
+    });
+  }
+
+  function hanimeDetailHtml(sec, d, slug) {
+    var v = d.video || {};
+    var year = String(v.released_at || '').slice(0, 4);
+    var bestQ = '';
+    ((d.streams) || []).forEach(function (s) {
+      var h = parseInt(String(s && s.height).replace(/\D/g, ''), 10) || 0;
+      if (h && (!bestQ || h > parseInt(bestQ, 10))) bestQ = h + 'p';
+    });
+    var stats = [fmtCompact(v.views) + ' views', fmtCompact(v.likes) + ' likes', bestQ, year]
+      .filter(Boolean).join(' · ');
+    var tags = ((v.tags) || []).slice(0, 20).map(function (t) {
+      return '<span class="chip">' + esc(t) + '</span>';
+    }).join('');
+    var fr = d.franchise || {};
+    var others = ((fr.videos) || []).filter(function (r) {
+      return r && r.slug && String(r.slug) !== String(v.slug || slug);
+    }).slice(0, 24);
+    var frRow = others.length
+      ? '<section class="online-block"><h2>More from ' + esc(fr.title || v.brand || 'this brand') +
+        '</h2><div class="rel-strip">' + others.map(function (r) {
+          return '<a class="poster-card" href="#/' + SEC_ID + '/online/hanime/' +
+            encodeURIComponent(r.slug) + '"><span class="poster-img"><img src="' +
+            esc(r.poster_url || '') + '" alt="' + esc(r.name || '') + '" loading="lazy">' +
+            '</span><span class="poster-title">' + esc(r.name || r.slug) +
+            '</span><span class="poster-meta">' + esc(r.brand || '') + '</span></a>';
+        }).join('') + '</div></section>' : '';
+    var desc = String(v.description || '').split(/\n+/).map(function (p) {
+      return '<p>' + esc(p) + '</p>';
+    }).join('');
+    return '<div class="online-detail" data-tone-root>' +
+      '<div class="online-wrap"><a class="back-link" href="#/' + SEC_ID + '/discover">' +
+        icon('arrowLeft') + '<span>Discover</span></a>' +
+        '<header class="detail-hero"><span class="poster-img big"><img src="' + esc(v.poster_url || '') +
+          '" alt="' + esc(v.name || '') + ' poster" loading="lazy"></span>' +
+        '<div class="detail-copy"><p class="detail-kicker">hanime</p>' +
+          '<h1>' + esc(v.name || slug) + '</h1><span class="adult18">18+</span>' +
+          '<p class="detail-meta">' + esc(stats) + '</p>' +
+          '<div class="detail-actions"><button type="button" class="trailer-btn" ' +
+            'data-hanime-play aria-label="Play video">' + icon('play') + '<span>Play</span></button></div>' +
+        '</div></header>' +
+        (desc ? '<section class="online-block"><h2>About</h2><p class="synopsis">' + desc +
+          '</p></section>' : '') +
+        (tags ? '<section class="online-block"><h2>Tags</h2><div class="chip-row">' + tags +
+          '</div></section>' : '') +
+        frRow + '</div></div>';
+  }
+
+  function fmtCompact(n) {
+    n = Number(n) || 0;
+    if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
+    return String(n);
+  }
 
   function detailHtml(sec, d, mediaType) {
     var isManga = (d.mediaType || mediaType) === 'MANGA';

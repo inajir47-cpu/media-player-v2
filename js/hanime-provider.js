@@ -92,12 +92,24 @@
     });
   }
 
+  /* Full video payload for the details page: {video, franchise, streams}. */
+  function haFull(slug) {
+    return haGetJson(HA + '/api/video/' + encodeURIComponent(slug)).then(function (d) {
+      return {
+        video: d.video || {},
+        franchise: d.franchise || {},
+        streams: ((d && d.streams) || []).filter(function (s) { return s && s.url; })
+      };
+    });
+  }
+
   window.haSearch = haSearch;
   window.HanimeProvider = {
     id: 'hanime',
     label: 'hanime',
     search: haSearch,
     video: haVideo,
-    genre: haGenre
+    genre: haGenre,
+    full: haFull
   };
 })();
