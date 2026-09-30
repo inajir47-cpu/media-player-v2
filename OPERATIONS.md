@@ -121,8 +121,8 @@ Obey this on every update. Updated 2026-09-30.
     website (<domain>)." Cancel/backdrop/Esc dismiss; only Proceed calls
     `window.open(url, '_blank', 'noopener')`. Internal `#/...` hash links are
     never intercepted. `data-no-confirm` on an anchor bypasses the modal.
-12. **God Mode + search filters**: 2026-09-30 (uncommitted at write time —
-    local only, NOT pushed/deployed). Animation search has a prominent God
+12. **God Mode + search filters**: 2026-09-30 (pushed this date; Render
+    redeployed). Animation search has a prominent God
     Mode toggle (persisted `mpv2_godmode_v1`) and All / Movie / Web Series /
     Manga filter chips (persisted `mpv2_search_filter_v1`). God Mode bypasses
     AniList/Jikan and searches provider servers directly in parallel with
@@ -152,7 +152,7 @@ Obey this on every update. Updated 2026-09-30.
     35/35, real Chromium 10/10
     (screenshots `v2-nhentai-results.png`, `v2-nhentai-warning.png`,
     `v2-nhentai-reader.png`). Pack: `v2-nhentai-20260930.zip`. Local commit
-    `a0ab568`, NOT pushed/deployed. Lesson: nhentai blocks datacenter IPs —
+    `a0ab568`, pushed 2026-09-30 (Render redeployed). Lesson: nhentai blocks datacenter IPs —
     sandbox/Render usually can't reach it; phone browser or the worker edge
     near the user is the real test. **Option 2 (Heliotrope/Hitomi mirror) is
     the planned backup provider — not built yet.**
@@ -176,7 +176,7 @@ Obey this on every update. Updated 2026-09-30.
     Verified: jsdom 29/29, real Chromium 10/10 (screenshots
     `v2-hitomi-results.png`, `v2-hitomi-warning.png`, `v2-hitomi-reader.png`).
     Pack: `v2-hitomi-20260930.zip`. Local commit `8bb818f`, NOT
-    pushed/deployed. Lesson: sandbox browsers fail CORS to inst.psec.dev AND
+    pushed 2026-09-30 (Render redeploying). Lesson: sandbox browsers fail CORS to inst.psec.dev AND
     block all external egress (even the worker), so the browser-side test
     used canned API responses; direct + worker paths were proven separately
     via curl. Phone test still pending — only Imran's device counts.
