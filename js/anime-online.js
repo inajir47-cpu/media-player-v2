@@ -570,15 +570,20 @@
     // preventDefault, so native scrolling is never blocked.
     var tSX = 0, tSY = 0, tDX = 0, tDY = 0, tActive = false;
     wrap.addEventListener('touchstart', function (e) {
+      // Contain the gesture in the carousel: it must not bubble up to the
+      // global tab-switch swipe handler on #view.
+      e.stopPropagation();
       var t = e.changedTouches[0];
       tSX = t.clientX; tSY = t.clientY; tDX = 0; tDY = 0; tActive = true;
     }, { passive: true });
     wrap.addEventListener('touchmove', function (e) {
+      e.stopPropagation();
       if (!tActive) return;
       var t = e.changedTouches[0];
       tDX = t.clientX - tSX; tDY = t.clientY - tSY;
     }, { passive: true });
-    function endTouchSwipe() {
+    function endTouchSwipe(e) {
+      if (e) e.stopPropagation();
       if (!tActive) return;
       tActive = false;
       if (Math.abs(tDX) > 50 && Math.abs(tDX) > Math.abs(tDY)) {
