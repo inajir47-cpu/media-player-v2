@@ -38,10 +38,14 @@ jobs:
           # calls at the live backend instead. The location.origin form must
           # be rewritten as a unit FIRST -- otherwise the two rewrites stack
           # and double the origin.
+          # NOTE: rewrite ONLY /api/stream/* (our own backend). Upstream
+          # providers have their own /api/* paths (reanime /api/flix/ +
+          # /api/v1/; nhentai /api/v2/; z-anime /api/embed/; hitomi
+          # /api/hitomi/ + /api/proxy/) and must NOT be rewritten.
           grep -rl "location\.origin" www/js | xargs sed -i -E \
-            "s#location\.origin[[:space:]]*\+[[:space:]]*(['\"\`])/api/#\1https://media-player-v2.onrender.com/api/#g"
-          grep -rlE "['\"\`]/api/" www/js | \
-            xargs sed -i -E "s#(['\"\`])/api/#\1https://media-player-v2.onrender.com/api/#g"
+            "s#location\.origin[[:space:]]*\+[[:space:]]*(['\"\`])/api/stream#\1https://media-player-v2.onrender.com/api/stream#g"
+          grep -rlE "['\"\`]/api/stream" www/js | \
+            xargs sed -i -E "s#(['\"\`])/api/stream#\1https://media-player-v2.onrender.com/api/stream#g"
           echo "Rewritten backend calls:"
           grep -rhoE "https://media-player-v2.onrender.com/api/[A-Za-z0-9/_?=-]+" www/js | sort -u
           # App icon + splash source

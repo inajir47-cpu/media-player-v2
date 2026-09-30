@@ -645,3 +645,19 @@ Obey this on every update. Updated 2026-09-30.
     queue (MAXC=4) nor poison the cache. Verified jsdom 3/3 with the real
     stream.js: fail-then-revisit retried the worker and painted SUB+DUB.
     NOT phone-tested — only Imran's device counts.
+37. 2026-10-01 — APK build: stop the /api/ rewrite from corrupting upstream
+    provider URLs. Bug (Imran: fresh APK from b8c39de still had no English
+    DUB and no hentai, while the PC website worked): build-apk.yml's sed
+    rewrote EVERY '/api/ to the Render backend URL, including upstream
+    providers' own API paths. In the APK, REANIME+'/api/flix/' became
+    REANIME+'https://media-player-v2.onrender.com/api/flix/' (worker asked
+    Render for ReAnime data -> 404 -> no DUB), NH+'/api/v2/...' became
+    NH+'https://media-player-v2.onrender.com/api/v2/...' (hentai broken),
+    and Z-Anime '/api/embed/' + hitomi '/api/hitomi/' + '/api/proxy/' were
+    silently broken too. Fix: both seds now rewrite ONLY /api/stream/*
+    (the app's own backend; verified all JS backend calls live under it),
+    leaving every upstream /api/* path byte-identical. Verified by running
+    the exact new seds on a fresh copy: 3 backend calls rewritten, 0
+    upstream corruptions, 0 leftover relative backend calls, 0 doublings,
+    node --check clean. Imran must re-run the workflow to get a fixed APK.
+    NOT phone-tested — only Imran's device counts.
