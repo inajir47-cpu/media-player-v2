@@ -385,10 +385,12 @@
          Math.min((e.position || 0) + 1, Math.max(e.duration || 1, 1)) + '/' + (e.duration || '?') +
          (done ? ' · Completed' : ''))
       : ((e.lang ? e.lang + ' · ' : '') + (done ? 'Completed' : (e.position > 3 ? W.fmtLeft(e) : 'Just started')));
-    return '<article class="rw-card">' +
+    var adult = !!(W && (W.isHentaiAnime(e) || W.isHentaiManga(e)));
+    return '<article class="rw-card' + (adult ? ' is-adult' : '') + '">' +
       (removable ? '<button type="button" class="rw-remove" data-rw-remove="' + esc(e.key) +
         '" aria-label="Remove ' + esc(e.title || 'this title') + ' from history">' + icon('x') + '</button>' : '') +
-      '<a class="rw-main" href="' + esc(e.href || '#/' + sec.id + '/home') + '">' +
+      '<a class="rw-main"' + (adult ? ' data-adult-gate="1"' : '') +
+        ' href="' + esc(e.href || '#/' + sec.id + '/home') + '">' +
         '<span class="rw-poster">' +
           (e.poster ? '<img src="' + esc(e.poster) + '" alt="" loading="lazy">' : '<span class="rw-noposter">' + icon('play') + '</span>') +
           '<span class="rw-badge">' + esc(badge) + '</span>' +
@@ -403,6 +405,31 @@
       '</button>' +
     '</article>';
   }
+  /* 18+ poster gate: the first tap/click on an adult card only reveals the
+   * poster for 5s (adds .revealed); a second tap/click within those 5s
+   * follows the link to the info page. Hover (PC) reveals via CSS.
+   * Continue and remove buttons are deliberately untouched. */
+  (function adultGate() {
+    var timers = {};
+    /* Capture phase: runs before wireMotionNavigation()'s bubble-phase
+     * document handler, which would otherwise navigate immediately. */
+    document.addEventListener('click', function (e) {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      var t = e.target;
+      if (!t || !t.closest) return;
+      if (t.closest('[data-rw-remove],[data-rv-remove],[data-rw-play]')) return;
+      var link = t.closest('[data-adult-gate]');
+      if (!link) return;
+      var card = link.closest('.is-adult');
+      if (!card || card.classList.contains('revealed')) return; // 2nd tap: open
+      e.preventDefault();
+      e.stopPropagation();
+      card.classList.add('revealed');
+      var k = link.getAttribute('href') || '';
+      clearTimeout(timers[k]);
+      timers[k] = setTimeout(function () { card.classList.remove('revealed'); }, 5000);
+    }, true);
+  })();
   /* Private hentai folders for the History and Watchlist pages. Two folders
    * that never mix: hentai anime (provider 'hanime') and hentai manga
    * (providers 'nhentai'/'hitomi'). The folder card is a blurred poster

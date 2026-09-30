@@ -360,7 +360,8 @@
     var cards = list.map(function (v) {
       var key = v.provider + ':' + v.id;
       var badge = v.isAdult ? '<span class="adult18 on-poster">18+</span>' : '';
-      return '<a class="poster-card online-card" href="' + esc(v.href) + '">' +
+      return '<a class="poster-card online-card' + (v.isAdult ? ' is-adult' : '') + '"' +
+        (v.isAdult ? ' data-adult-gate="1"' : '') + ' href="' + esc(v.href) + '">' +
         '<span class="poster-img"><img src="' + esc(v.image) + '" alt="' + esc(v.title) +
         ' poster" loading="lazy">' + badge +
         '<button class="rw-remove" data-rv-remove="' + esc(key) + '" aria-label="Remove from recently viewed">' + icon('x') + '</button></span>' +
@@ -379,7 +380,8 @@
     var cards = list.map(function (v) {
       var key = v.provider + ':' + v.id;
       var badge = v.isAdult ? '<span class="adult18 on-poster">18+</span>' : '';
-      return '<a class="poster-card online-card" href="' + esc(v.href) + '">' +
+      return '<a class="poster-card online-card' + (v.isAdult ? ' is-adult' : '') + '"' +
+        (v.isAdult ? ' data-adult-gate="1"' : '') + ' href="' + esc(v.href) + '">' +
         '<span class="poster-img"><img src="' + esc(v.image) + '" alt="' + esc(v.title) +
         ' poster" loading="lazy">' + badge +
         '<button class="rw-remove" data-rv-remove="' + esc(key) + '" data-rv-manga="1" aria-label="Remove from recently viewed">' + icon('x') + '</button></span>' +

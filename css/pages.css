@@ -63,7 +63,15 @@
 .rw-list .rw-card{flex:1 1 auto; width:100%}
 /* Private hentai folders: blurred poster cards with no name. */
 .hfolder-row{display:flex; gap:14px; margin:2px 0 18px}
-.hfolder{position:relative; display:block; width:148px; max-width:40vw; aspect-ratio:2/3;
+/* 18+ posters stay blurred until hovered (PC) or tapped (touch).
+ * First tap/click adds .revealed for 5s (JS); a second tap/click within
+ * those 5s opens the info page. Titles are never blurred. */
+.rw-card.is-adult .rw-poster img,
+.poster-card.is-adult .poster-img img{filter:blur(14px) brightness(.72)}
+.rw-card.is-adult:hover .rw-poster img,
+.rw-card.is-adult.revealed .rw-poster img,
+.poster-card.is-adult:hover .poster-img img,
+.poster-card.is-adult.revealed .poster-img img{filter:none}.hfolder{position:relative; display:block; width:148px; max-width:40vw; aspect-ratio:2/3;
   border-radius:14px; overflow:hidden; background:#0b0b0d;
   border:1px solid var(--line, rgba(255,255,255,.08))}
 .hfolder-poster{position:absolute; inset:0; display:block}

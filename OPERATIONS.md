@@ -804,3 +804,30 @@ Obey this on every update. Updated 2026-09-30.
     History + Watchlist, main lists exclude hentai, folder views list the
     right items, detail button saves/removes and persists. Committed
     locally, NOT pushed, NOT phone-tested.
+
+## 49. 2026-10-01 — 18+ poster blur with tap-to-reveal on Recently Watched / Recently Viewed
+- Request: any 18+ title in Recently Watched or Recently Viewed shows a
+  blurred poster; PC hover reveals while hovered, click reveals for 5s;
+  touch single-tap reveals for 5s; a second tap/click inside the 5s opens
+  the info page.
+- js/app.js: historyCardHtml() adds `is-adult` on .rw-card and
+  `data-adult-gate` on .rw-main when Watch.isHentaiAnime(e) ||
+  isHentaiManga(e). New adultGate() IIFE: one document click listener in
+  CAPTURE phase (must run before wireMotionNavigation()'s bubble handler,
+  which otherwise navigates immediately) — first tap preventDefault +
+  stopPropagation, adds .revealed for 5s; second tap inside 5s falls
+  through to the info page. Ctrl/meta-click bypasses the gate so
+  open-in-new-tab still works; Continue/remove buttons untouched.
+- js/anime-online.js: recentlyViewedHtml() and recentlyViewedMangaHtml()
+  add `is-adult` + `data-adult-gate` on .poster-card when v.isAdult.
+- css/pages.css: .rw-card.is-adult / .poster-card.is-adult poster imgs get
+  blur(14px) brightness(.72); :hover and .revealed clear the filter.
+  Titles are never blurred.
+- Verified real Chromium 21/21 (seeded hanime + nhentai + normal entries):
+  adult cards flagged and blurred, normal cards clean, hover rules in
+  stylesheet, 1st tap blocks nav + reveals, 2nd tap opens info page,
+  re-blur at ~5s, manga Recently Viewed row covered. Debugging note: the
+  app's motion router intercepts a[href^="#/"] clicks and sets
+  location.hash directly, so a bubble-phase gate can never win — capture
+  phase + stopPropagation is required. Committed locally, NOT pushed,
+  NOT phone-tested.
