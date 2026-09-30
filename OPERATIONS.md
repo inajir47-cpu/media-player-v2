@@ -425,6 +425,24 @@ Obey this on every update. Updated 2026-09-30.
     meta + global `box-sizing` already correct. Verified jsdom 5/5
     (boot→top, nav→top, same-hash preserves scroll). NOT phone-tested —
     only Imran's device counts.
+25. 2026-09-30 — Modal popup scroll containment (Imran approved the exact
+    diffs before apply; screenshots showed the character popup's scrollbar
+    bleeding past the rounded corners and running over the sticky header).
+    `js/anime-online.js` `openPopup()`: body wrapped in a dedicated
+    `<div class="st-scroll">`. `css/anime-online.css`: `.st-dialog.rv-dialog`
+    is now `overflow:hidden` + flex column with `padding:0` (the
+    `.st-dialog.rv-dialog` specificity is deliberate — stream.css loads
+    after this file, so a bare `.rv-dialog` lost on overflow/padding);
+    `.st-head` is a fixed relative bar (`z-index:5`); only `.st-scroll`
+    scrolls (`overflow-y:auto`, `overflow-x:clip`), with the slim OLED
+    scrollbar moved onto it. The dialog frame clips the scrollbar to its
+    20px radius; the scrollbar can never cross the header/✕ again.
+    Covers all four `openPopup()` popups: Rating & Reviews, Character,
+    Voice actor, MangaDex chapter picker. Provider chooser (stream.js)
+    untouched — separate pattern, offered as follow-up. Verified real
+    Chromium 11/11 (computed styles, header pinned while body scrolls,
+    dialog within 82vh, screenshots top+bottom states clean). NOT
+    phone-tested — only Imran's device counts.
 
 ## Standing rules — obey on every update
 

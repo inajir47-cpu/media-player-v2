@@ -72,7 +72,7 @@
           (sub ? '<p class="st-sub">' + esc(sub) + '</p>' : '') + '</div>' +
           '<button class="st-x" type="button" aria-label="Close">' + icon('x') + '</button>' +
         '</div>' +
-        '<div class="rv-body">' + bodyHtml + '</div>' +
+        '<div class="st-scroll"><div class="rv-body">' + bodyHtml + '</div></div>' +
       '</div>';
     document.body.appendChild(scrim);
     lockBodyScroll();

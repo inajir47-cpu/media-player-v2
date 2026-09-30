@@ -782,6 +782,28 @@ button.trailer-btn { cursor: pointer; font-family: inherit; }
   padding: 2px 12px; font-size: .92em; }
 .rv-dialog { text-align: left; }
 .rv-body { display: flex; flex-direction: column; gap: 14px; }
+
+/* ---------- popup scroll containment ---------- */
+/* The dialog frame clips to its rounded corners; the header is a fixed bar;
+   only .st-scroll scrolls — the scrollbar can never bleed past the rounded
+   borders or run over the header / close button.
+   (.st-dialog.rv-dialog specificity: stream.css loads after this file, so a
+   bare .rv-dialog would lose on overflow/padding.) */
+.st-dialog.rv-dialog { overflow: hidden; display: flex; flex-direction: column; padding: 0; }
+.rv-dialog .st-head {
+  position: relative; top: auto; z-index: 5; flex: none;
+  margin: 0; border-radius: 0;
+}
+.rv-dialog .st-scroll {
+  flex: 1 1 auto; min-height: 0; min-width: 0;
+  overflow-y: auto; overflow-x: clip;
+  padding: 4px 18px 20px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent;
+}
+.rv-dialog .st-scroll::-webkit-scrollbar { width: 8px; }
+.rv-dialog .st-scroll::-webkit-scrollbar-track { background: transparent; }
+.rv-dialog .st-scroll::-webkit-scrollbar-thumb { border-radius: 8px; background: rgba(255,255,255,.18); }
 .rv-score-head { display: flex; align-items: baseline; gap: 10px; }
 .rv-score-big { font-size: 34px; font-weight: 800; color: #ffd76a; }
 .rv-score-sub { font-size: 13px; color: rgba(255,255,255,.55); }
