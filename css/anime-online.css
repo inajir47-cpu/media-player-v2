@@ -892,3 +892,29 @@ button.trailer-btn { cursor: pointer; font-family: inherit; }
 .adult-warn-cancel { flex: 1; padding: 13px; border-radius: 14px; font: inherit;
   font-size: 15px; font-weight: 800; color: #fff; cursor: pointer;
   background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14); }
+
+/* External link confirmation modal */
+.ext-confirm { position: fixed; inset: 0; z-index: 9999; display: flex;
+  align-items: center; justify-content: center; padding: 24px;
+  background: rgba(0,0,0,.72); backdrop-filter: blur(6px);
+  opacity: 0; visibility: hidden; transition: opacity .18s ease, visibility .18s; }
+.ext-confirm.open { opacity: 1; visibility: visible; }
+.ext-confirm-card { width: 100%; max-width: 340px; background: #0a0a0c;
+  border: 1px solid #232326; border-radius: 20px; padding: 28px 24px 24px;
+  text-align: center; transform: translateY(8px) scale(.97);
+  transition: transform .18s ease; }
+.ext-confirm.open .ext-confirm-card { transform: none; }
+.ext-confirm-icon { width: 52px; height: 52px; margin: 0 auto 14px;
+  border-radius: 16px; display: flex; align-items: center; justify-content: center;
+  background: rgba(168,85,247,.12); color: #a855f7; }
+.ext-confirm-icon .icon { width: 26px; height: 26px; }
+.ext-confirm-card h3 { margin: 0 0 8px; font-size: 17px; font-weight: 700; color: #fafafa; }
+.ext-confirm-msg { margin: 0 0 22px; font-size: 14px; line-height: 1.55; color: #a1a1aa; }
+.ext-confirm-actions { display: flex; gap: 10px; }
+.ext-confirm-cancel, .ext-confirm-ok { flex: 1; padding: 13px 0; border-radius: 14px;
+  font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit;
+  border: 1px solid #2a2a2e; }
+.ext-confirm-cancel { background: #141416; color: #e4e4e7; }
+.ext-confirm-cancel:active { opacity: .7; }
+.ext-confirm-ok { background: #a855f7; border-color: #a855f7; color: #fff; }
+.ext-confirm-ok:active { opacity: .85; }

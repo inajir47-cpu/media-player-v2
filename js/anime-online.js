@@ -2392,11 +2392,76 @@
     }
   });
 
+  /* ---------------- external link confirmation ---------------- */
+  // Any absolute http(s) link (trailer button, episode globe, markdown links
+  // in descriptions/reviews) opens this confirmation first instead of
+  // navigating directly. Internal #/... hash links are never intercepted.
+  var extConfirmEl = null;
+
+  function extConfirmDomain(url) {
+    try { return new URL(url, location.href).hostname.replace(/^www\./, '') || url; }
+    catch (e) { return url; }
+  }
+  function closeExtConfirm() {
+    if (extConfirmEl) extConfirmEl.classList.remove('open');
+  }
+  function openExtConfirm(url) {
+    var host = extConfirmDomain(url).toLowerCase();
+    var isYt = host === 'youtube.com' || host === 'youtu.be' ||
+               host.slice(-12) === '.youtube.com';
+    var msg = isYt
+      ? 'This will open YouTube to play the trailer.'
+      : 'This will open an external website (' + extConfirmDomain(url) + ').';
+    if (!extConfirmEl) {
+      extConfirmEl = document.createElement('div');
+      extConfirmEl.className = 'ext-confirm';
+      extConfirmEl.innerHTML =
+        '<div class="ext-confirm-card" role="dialog" aria-modal="true" aria-labelledby="extConfirmTitle">' +
+          '<div class="ext-confirm-icon">' + icon('globe') + '</div>' +
+          '<h3 id="extConfirmTitle">Open external link?</h3>' +
+          '<p class="ext-confirm-msg"></p>' +
+          '<div class="ext-confirm-actions">' +
+            '<button type="button" class="ext-confirm-cancel">Cancel</button>' +
+            '<button type="button" class="ext-confirm-ok">Proceed</button>' +
+          '</div>' +
+        '</div>';
+      extConfirmEl.addEventListener('click', function (e) {
+        if (e.target === extConfirmEl) return closeExtConfirm();          // backdrop tap
+        if (e.target.closest('.ext-confirm-cancel')) return closeExtConfirm();
+        if (e.target.closest('.ext-confirm-ok')) {
+          var u = extConfirmEl.dataset.url || '';
+          closeExtConfirm();
+          if (u) window.open(u, '_blank', 'noopener');
+        }
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeExtConfirm();
+      });
+      document.body.appendChild(extConfirmEl);
+    }
+    extConfirmEl.dataset.url = url;
+    extConfirmEl.querySelector('.ext-confirm-msg').textContent = msg;
+    extConfirmEl.classList.add('open');
+  }
+  function wireExternalConfirm() {
+    if (wireExternalConfirm.done) return;
+    wireExternalConfirm.done = true;
+    document.addEventListener('click', function (e) {
+      var a = e.target.closest
+        ? e.target.closest('a[href^="http://"],a[href^="https://"]')
+        : null;
+      if (!a || a.hasAttribute('data-no-confirm')) return;
+      e.preventDefault();
+      openExtConfirm(a.href);
+    });
+  }
+
   // The app boots (and renders the boot hash) before this module loads. If it
   // booted directly onto a Discover/online-detail route, or onto the Animation
   // home page (which now embeds the Discover block), render again now that
   // the pages and the detail renderer exist.
   (function () {
+    wireExternalConfirm();
     var h = location.hash || '';
     if (h.indexOf('#/' + SEC_ID + '/discover') === 0 ||
         h === '#/' + SEC_ID || h === '#/' + SEC_ID + '/' || h === '#/' + SEC_ID + '/home' ||

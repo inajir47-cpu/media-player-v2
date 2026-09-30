@@ -108,6 +108,15 @@ Obey this on every update. Updated 2026-09-30.
     removal (section hides when empty) + toast, never navigates. Bug caught in
     testing: the section must be captured *before* `card.remove()` detaches the
     button from the DOM, otherwise `closest('section')` returns null.
+11. **External link confirmation modal**: 2026-09-30 (uncommitted at write
+    time). One document-level delegated handler in `js/anime-online.js`
+    (`wireExternalConfirm()`) intercepts every absolute http(s) link — trailer
+    button, episode globe, markdown links in descriptions/reviews — before it
+    navigates. Shows an OLED-styled modal: YouTube links get "This will open
+    YouTube to play the trailer.", others get "This will open an external
+    website (<domain>)." Cancel/backdrop/Esc dismiss; only Proceed calls
+    `window.open(url, '_blank', 'noopener')`. Internal `#/...` hash links are
+    never intercepted. `data-no-confirm` on an anchor bypasses the modal.
 
 ## Standing rules — obey on every update
 
