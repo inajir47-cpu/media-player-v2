@@ -123,7 +123,12 @@
     var anime = (c.anime || []).length
       ? '<h4 class="rv-sec">Appears in</h4><div class="ch-pop-grid">' +
         c.anime.map(function (a) {
-          return '<div class="ch-pop-item"><img src="' + esc(a.image) + '" alt="' + esc(a.title) +
+          var mAttr = a.id
+            ? ' data-media-provider="' + esc(lastDetailProvider) + '" data-media-id="' + esc(String(a.id)) +
+              '" data-media-kind="' + esc(a.mediaType === 'MANGA' ? 'manga' : 'anime') +
+              '" tabindex="0" role="link" aria-label="' + esc(a.title) + '"'
+            : '';
+          return '<div class="ch-pop-item' + (a.id ? ' is-link' : '') + '"' + mAttr + '><img src="' + esc(a.image) + '" alt="' + esc(a.title) +
             '" loading="lazy"><span>' + esc(a.title) + '</span></div>';
         }).join('') + '</div>' : '';
     var vas = (c.vas || []).length
@@ -1741,6 +1746,17 @@
         va.getAttribute('data-va-src') || 'anilist');
       return;
     }
+    // "Appears in" posters inside the character popup: close the popup and
+    // open the tapped title's detail page.
+    var media = e.target.closest('[data-media-id]');
+    if (media) {
+      var mProv = media.getAttribute('data-media-provider') || lastDetailProvider || 'anilist';
+      var mKind = media.getAttribute('data-media-kind') || 'anime';
+      closePopup();
+      location.hash = '#/' + SEC_ID + '/online/' + mProv + '/' +
+        (mKind === 'manga' ? 'manga/' : '') + encodeURIComponent(media.getAttribute('data-media-id'));
+      return;
+    }
     var card = e.target.closest('.online-cast[data-char-id]');
     if (card) {
       // Character info opens in a popup, not a full page. Details are
@@ -1762,6 +1778,12 @@
       openVaPopup(e.target.getAttribute('data-va-provider') || lastDetailProvider,
         e.target.getAttribute('data-va-id'), e.target.getAttribute('data-va-name') || '',
         e.target.getAttribute('data-va-src') || 'anilist');
+      return;
+    }
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.classList &&
+        e.target.hasAttribute('data-media-id')) {
+      e.preventDefault();
+      e.target.click();
       return;
     }
     if ((e.key === 'Enter' || e.key === ' ') && e.target.classList &&

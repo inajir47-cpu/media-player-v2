@@ -708,6 +708,7 @@ button.trailer-btn { cursor: pointer; font-family: inherit; }
 .ch-pop-name { margin: 0; font-size: 22px; font-weight: 800; color: #fff; }
 .ch-pop-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .ch-pop-item { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ch-pop-item.is-link { cursor: pointer; }
 .ch-pop-item img { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 10px; }
 .ch-pop-item span { font-size: 11px; color: rgba(255,255,255,.65);
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
