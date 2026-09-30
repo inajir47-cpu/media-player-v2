@@ -21,6 +21,18 @@
 
 /* TOP 010 ranked rows */
 .top10-list { display: flex; flex-direction: column; gap: 8px; }
+/* TOP 010 heading: outlined "TOP" + solid bold "010" */
+.top10-title { font-size: 26px; font-weight: 900; letter-spacing: 2px; margin: 0; }
+.top10-title .t-outline {
+  color: rgba(255,255,255,.35); /* fallback: semi-transparent */
+}
+@supports (-webkit-text-stroke: 1px black) {
+  .top10-title .t-outline {
+    color: transparent;
+    -webkit-text-stroke: 1.5px var(--tone);
+  }
+}
+.top10-title .t-solid { color: var(--text); }
 /* TOP 010 auto-carousel viewport: desktop/tablet show 3 rows and scroll
    vertically; phones show 1 card (2 on wider phones) and scroll
    horizontally. Scrollbars hidden — wheel / touch / drag still scroll. */

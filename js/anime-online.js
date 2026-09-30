@@ -267,6 +267,34 @@
     return '<span class="poster-score">' + (item.score / 10).toFixed(1) + '</span>';
   }
 
+  /* --------------------- Recently viewed (detail pages) --------------------- */
+  // Last 10 anime/movie/OVA detail pages the user opened. Manga is strictly
+  // excluded. Device-local localStorage, most-recent first.
+  var LS_RECENT_VIEWED = 'mpv2_recently_viewed_v1';
+  function getRecentlyViewed() {
+    try {
+      var v = JSON.parse(localStorage.getItem(LS_RECENT_VIEWED));
+      return Array.isArray(v) ? v : [];
+    } catch (e) { return []; }
+  }
+  function recordView(d, provider, id, mediaType) {
+    if (!d || !d.title) return;
+    var mt = d.mediaType || mediaType || '';
+    if (mt === 'MANGA') return;
+    var key = provider + ':' + id;
+    var entry = {
+      provider: provider, id: id, title: d.title, image: d.image || '',
+      mediaType: mt, format: d.format || '',
+      href: '#/' + SEC_ID + '/online/' + provider + '/' + id,
+      viewedAt: Date.now()
+    };
+    var list = getRecentlyViewed().filter(function (e) {
+      return e && (e.provider + ':' + e.id) !== key;
+    });
+    list.unshift(entry);
+    try { localStorage.setItem(LS_RECENT_VIEWED, JSON.stringify(list.slice(0, 10))); } catch (e) {}
+  }
+
   /* -------------------------- Recommendations --------------------------- */
   // "Recommended for you" row, seeded from the current TOP 010 chart-topper.
   // Sits directly above the TOP 010 list on the home page.
@@ -276,6 +304,22 @@
       '<div><h2>Recommended for you</h2><p class="online-sub">More like the chart-topper · Source: ' +
       esc(providerName()) + '</p></div></div>' +
       '<div class="poster-row" id="recoRow">' + skeletonCards(6) + '</div></section>';
+  }
+
+  // "Recently Viewed" row: last 10 anime/movie/OVA detail pages the user
+  // opened (manga excluded). Hidden entirely when there is no history yet.
+  function recentlyViewedHtml() {
+    var list = getRecentlyViewed();
+    if (!list.length) return '';
+    var cards = list.map(function (v) {
+      return '<a class="poster-card online-card" href="' + esc(v.href) + '">' +
+        '<span class="poster-img"><img src="' + esc(v.image) + '" alt="' + esc(v.title) +
+        ' poster" loading="lazy"></span>' +
+        '<span class="poster-title">' + esc(v.title) + '</span></a>';
+    }).join('');
+    return '<section class="online-block" id="recentlyViewedBlock"><div class="online-head">' +
+      '<div><h2>Recently Viewed</h2><p class="online-sub">Pick up where you left off</p></div>' +
+      '</div><div class="poster-row">' + cards + '</div></section>';
   }
 
   function loadReco(block, seed) {
@@ -599,7 +643,7 @@
         (state.range === r.id) + '">' + r.label + '</button>';
     }).join('');
     return '<section class="online-block"><div class="online-head">' +
-        '<div><h2>TOP 010</h2><p class="online-sub">Trending ' + (manga ? 'manga' : 'anime') +
+        '<div><h2 class="top10-title"><span class="t-outline">TOP</span> <span class="t-solid">010</span></h2><p class="online-sub">Trending ' + (manga ? 'manga' : 'anime') +
         ' · Source: ' + esc(providerName()) + '</p></div>' +
         '<div class="pill-row" role="tablist" aria-label="Time range">' + pills + '</div>' +
       '</div><div class="top10-viewport" id="top10Viewport"><div class="top10-list" id="top10List">' + skeletonRows(5) + '</div></div></section>';
@@ -813,7 +857,7 @@
     return '<section class="row online-discover-block" id="discoverBlock">' +
       '<div class="row-head"><h2>Discover</h2>' +
       '<span class="muted-link">Live rankings · ' + esc(providerName()) + '</span></div>' +
-      '<div class="online-wrap">' + recoHtml() + top10Html() + genreHtml() + '</div></section>';
+      '<div class="online-wrap">' + recoHtml() + recentlyViewedHtml() + top10Html() + genreHtml() + '</div></section>';
   };
 
   window.MPV2.mountDiscoverBlock = function (sec, root) {
@@ -1153,6 +1197,7 @@
       document.title = d.title + ' · ' + sec.name + ' · Media Player V2';
       mount.innerHTML = detailHtml(sec, d, mediaType);
       lastDetail = d; lastDetailProvider = provider;
+      recordView(d, provider, id, mediaType);
       // Prefetch character details for every displayed cast card now, so the
       // character popup opens instantly (results are cached 7 days).
       (d.characters || []).forEach(function (c) {
