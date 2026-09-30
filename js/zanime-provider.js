@@ -37,33 +37,47 @@
       '/' + (audio === 'dub' ? 'dub' : 'sub');
   }
 
-  // Returns Promise<boolean> — true if any server has this episode.
-  // Fetches through our worker for CORS; treats the "Embed error"
-  // page as unavailable. Cached per (anilistId, ep) for the session.
-  var availCache = {};
-  var dubCache = {};
-  function zProbe(anilistId, ep, audio, cache) {
-    if (!anilistId || !ep) return Promise.resolve(false);
-    var key = anilistId + ':' + ep;
-    if (key in cache) return Promise.resolve(cache[key]);
-    var url = zEmbedUrl(anilistId, ep, audio, SERVERS[0]);
-    var proxied = WORKER + '/hls?d=' + b64url(url);
+  // Server probing: tries every server in SERVERS order and remembers the
+  // first one whose embed page looks good, per (anilistId, ep, audio) for
+  // the session. An episode counts as available when ANY server has it.
+  var serverCache = {};
+  function zProbePage(anilistId, ep, audio, server) {
+    var proxied = WORKER + '/hls?d=' + b64url(zEmbedUrl(anilistId, ep, audio, server));
     return fetch(proxied, { method: 'GET' }).then(function (r) {
       return r.text();
     }).then(function (t) {
-      var ok = t.indexOf('Embed error') === -1 &&
-               t.indexOf('Playback unavailable') === -1 &&
-               t.length > 1000;
-      cache[key] = ok;
-      return ok;
-    }).catch(function () {
-      return false;
-    });
+      return t.indexOf('Embed error') === -1 &&
+             t.indexOf('Playback unavailable') === -1 &&
+             t.length > 1000;
+    }).catch(function () { return false; });
   }
-  // Sub availability (existing behaviour, unchanged results).
-  function zHasEpisode(anilistId, ep) { return zProbe(anilistId, ep, 'sub', availCache); }
-  // Dub availability — lets Z-Anime light the English DUB badge.
-  function zHasDub(anilistId, ep) { return zProbe(anilistId, ep, 'dub', dubCache); }
+  function zFindServer(anilistId, ep, audio) {
+    if (!anilistId || !ep) return Promise.resolve('');
+    var key = anilistId + ':' + ep + ':' + audio;
+    if (key in serverCache) return Promise.resolve(serverCache[key]);
+    var i = 0;
+    function next() {
+      if (i >= SERVERS.length) { serverCache[key] = ''; return Promise.resolve(''); }
+      var srv = SERVERS[i++];
+      return zProbePage(anilistId, ep, audio, srv).then(function (ok) {
+        if (ok) { serverCache[key] = srv; return srv; }
+        return next();
+      });
+    }
+    return next();
+  }
+  // Sub availability — true when any server has the sub embed.
+  function zHasEpisode(anilistId, ep) {
+    return zFindServer(anilistId, ep, 'sub').then(function (s) { return !!s; });
+  }
+  // Dub availability — true when any server has the dub embed.
+  function zHasDub(anilistId, ep) {
+    return zFindServer(anilistId, ep, 'dub').then(function (s) { return !!s; });
+  }
+  // First working server for playback (falls back to SERVERS[0]).
+  function zBestServer(anilistId, ep, audio) {
+    return zFindServer(anilistId, ep, audio).then(function (s) { return s || SERVERS[0]; });
+  }
 
   window.ZAnimeProvider = {
     id: 'zanime',
@@ -71,7 +85,8 @@
     servers: SERVERS,
     embedUrl: zEmbedUrl,
     hasEpisode: zHasEpisode,
-    hasDub: zHasDub
+    hasDub: zHasDub,
+    bestServer: zBestServer
   };
   // Alias matching the naming style of the other providers.
   window.zaHasEpisode = zHasEpisode;

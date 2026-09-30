@@ -691,3 +691,12 @@ Obey this on every update. Updated 2026-09-30.
     cache) + live senshi responses from sandbox. Permission note: Zane's
     explicit permission covered the zplayer embed; senshi/justanime workers are
     his private infra — Imran (co-admin) approved integrating. NOT phone-tested.
+40. 2026-10-01 — Z-Player now uses all embed servers (hd-1/2/3), not just
+    hd-1. Imran confirmed. js/zanime-provider.js: zFindServer() tries every
+    server in SERVERS order and caches the first working one per
+    (anilistId, ep, audio); an episode counts as available when ANY server
+    has it. zHasEpisode/zHasDub use it; new bestServer() feeds playback.
+    js/stream.js: the za playback branch resolves bestServer() and builds the
+    embed URL with it (falls back to hd-1). Verified node: hd-1 fail ->
+    hd-2 probed and used, embed URL correct, session cache stops refetches,
+    sub/dub caches independent. NOT phone-tested.

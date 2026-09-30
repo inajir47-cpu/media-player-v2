@@ -861,9 +861,12 @@
         // Z-Anime: the worker serves a full HTML player page, so we hand
         // back an embed URL and let the player shell load it in an iframe.
         var audio = (lang === 'English') ? 'dub' : 'sub';
-        var embed = window.ZAnimeProvider.embedUrl(ctx.anilistId, n, audio, 'hd-1');
-        return Promise.resolve({ embed: embed, audioTracks: [], subtitles: [],
-          providerLabel: 'Z-Anime · Z-Player' });
+        // Play from the first server that probed OK (falls back to hd-1).
+        return window.ZAnimeProvider.bestServer(ctx.anilistId, n, audio).then(function (srv) {
+          var embed = window.ZAnimeProvider.embedUrl(ctx.anilistId, n, audio, srv);
+          return { embed: embed, audioTracks: [], subtitles: [],
+            providerLabel: 'Z-Anime · Z-Player' };
+        });
       }
       return enReanimeId(ctx.anilistId, ctx.title).then(function (animeId) {
         if (!animeId) throw new Error('Could not match this title on the stream server');
