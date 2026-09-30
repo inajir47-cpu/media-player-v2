@@ -631,3 +631,17 @@ Obey this on every update. Updated 2026-09-30.
     Preserved: staged badge painting, dialog refresh, queue dedupe,
     MutationObserver for late cards, manga chapter globes (untouched).
     NOT phone-tested — only Imran's device counts.
+36. 2026-09-30 — DUB badge: stop caching transient English failures.
+    Bug (Imran: DUB option missing on V2 website while Konosuba player shows
+    it for the same title): `js/stream.js` `enServers()` cached the `[]`
+    from a failed worker request in `serversCache` for the whole session, so
+    one transient mobile-network failure hid SUB/DUB for that episode until
+    reload. Konosuba's player uses XHR with a 20s timeout and no failure
+    cache, so it survived the same network. Fix: the rejection handler now
+    does `delete serversCache[k]` before returning `[]` — genuine empty
+    results stay cached (no extra worker traffic), failures retry on the
+    next check. Pairs with entry 35's 12s `wGetJSON` cap (already local,
+    awaiting push): a hung/timed-out worker can no longer wedge the badge
+    queue (MAXC=4) nor poison the cache. Verified jsdom 3/3 with the real
+    stream.js: fail-then-revisit retried the worker and painted SUB+DUB.
+    NOT phone-tested — only Imran's device counts.

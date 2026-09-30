@@ -114,7 +114,10 @@
     var k = anilistId + ':' + ep;
     if (!serversCache[k]) {
       serversCache[k] = wGetJSON(REANIME + '/api/flix/' + anilistId + '/' + ep)
-        .then(function (d) { return d.servers || []; }, function () { return []; });
+        .then(function (d) { return d.servers || []; },
+              // Transient failure: don't poison the cache — evict so the next
+              // badge check retries instead of hiding DUB for the whole session.
+              function () { delete serversCache[k]; return []; });
     }
     return serversCache[k];
   }
