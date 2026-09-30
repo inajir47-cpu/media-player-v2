@@ -35,12 +35,13 @@ jobs:
           rm -f www/sw.js
           # The app calls its Render backend with same-origin /api/* paths.
           # Inside the APK the origin is https://localhost, so point those
-          # calls at the live backend instead. This covers both plain
-          # '/api/...' literals and location.origin + '/api/...' forms.
+          # calls at the live backend instead. The location.origin form must
+          # be rewritten as a unit FIRST -- otherwise the two rewrites stack
+          # and double the origin.
+          grep -rl "location\.origin" www/js | xargs sed -i -E \
+            "s#location\.origin[[:space:]]*\+[[:space:]]*(['\"\`])/api/#\1https://media-player-v2.onrender.com/api/#g"
           grep -rlE "['\"\`]/api/" www/js | \
             xargs sed -i -E "s#(['\"\`])/api/#\1https://media-player-v2.onrender.com/api/#g"
-          grep -rl "location\.origin" www/js | \
-            xargs sed -i "s#location\.origin#'https://media-player-v2.onrender.com'#g"
           echo "Rewritten backend calls:"
           grep -rhoE "https://media-player-v2.onrender.com/api/[A-Za-z0-9/_?=-]+" www/js | sort -u
           # App icon + splash source
