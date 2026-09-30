@@ -156,6 +156,30 @@ Obey this on every update. Updated 2026-09-30.
     sandbox/Render usually can't reach it; phone browser or the worker edge
     near the user is the real test. **Option 2 (Heliotrope/Hitomi mirror) is
     the planned backup provider — not built yet.**
+14. **2026-09-30 — Heliotrope adult-manga provider (Option 2, backup).** New
+    `js/heliotrope-provider.js`: keyless Heliotrope REST on
+    `https://inst.psec.dev` (all-languages instance; API surface read from its
+    live `/docs/openapi.json` and response shapes probed live).
+    `POST /api/hitomi/search?offset=1` `{query:[q]}` -> `{results:[...]}`;
+    card thumbnails via `GET /api/hitomi/thumbnail/{id}?size=big&single=false`;
+    reader pages via `GET /api/hitomi/image/{id}`; titles via
+    `GET /api/hitomi/galleryinfo/{id}`. ALL image URLs (cards + pages) are
+    routed through Heliotrope's `GET /api/proxy/{urlencoded}` so the reader
+    never hits CORS/hotlink walls. Direct-first, worker `?d=` fallback
+    (worker v2+ forwards the POST body — verified). God Mode
+    (`anime-api.js`) queries `htSearch` in PARALLEL with `nhSearch` under the
+    same 18+ opt-in (`mpv2_settings_v1.adult`), per-provider isolation: when
+    nhentai is down/blocked, hitomi results still land. Cards show purple
+    `hitomi` server tag + 18+ badge + EN/JA/ZH/KO badge; tap shows the 18+
+    warning every time, then opens the gallery in the Manga Reader with
+    pre-resolved proxied pages (progress namespaced under `hitomi:<id>`).
+    Verified: jsdom 29/29, real Chromium 10/10 (screenshots
+    `v2-hitomi-results.png`, `v2-hitomi-warning.png`, `v2-hitomi-reader.png`).
+    Pack: `v2-hitomi-20260930.zip`. Local commit `8bb818f`, NOT
+    pushed/deployed. Lesson: sandbox browsers fail CORS to inst.psec.dev AND
+    block all external egress (even the worker), so the browser-side test
+    used canned API responses; direct + worker paths were proven separately
+    via curl. Phone test still pending — only Imran's device counts.
 
 ## Standing rules — obey on every update
 
