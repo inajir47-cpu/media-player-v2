@@ -408,6 +408,23 @@ Obey this on every update. Updated 2026-09-30.
     non-root history.back, root double-press → 'exit'). Website behavior
     untouched (no native caller there). NOT phone-tested — only Imran's
     device counts.
+24. 2026-09-30 — View-reset + overflow hardening (Imran approved the exact
+    diffs before apply). (a) `js/app.js` `render()` now preserves scroll
+    position on same-hash re-renders: provider switches, TMDB key
+    save/clear, and the late-module boot re-render no longer jump to top;
+    real navigations (hash changed) still scroll to top, and fresh boot is
+    unaffected (`lastRenderedHash` starts `null`). Tab taps, swipe tabs,
+    and the motion system were audited and are clean (active-tab taps
+    guarded, `motion.busy` resets on every path). (b) `css/base.css`:
+    `overflow-x:clip` on `html`+`body` as a page-level horizontal-scroll
+    guard — `clip` (not `hidden`) so the sticky topbar keeps working.
+    Measured in real Chromium at phone widths before the change: zero
+    page-level horizontal overflow on all 9 routes (landing, animation
+    home/discover/anime/manga/settings/history, movies home, both detail
+    pages); overlays are all `fixed inset-0` / `width:min(...)`, viewport
+    meta + global `box-sizing` already correct. Verified jsdom 5/5
+    (boot→top, nav→top, same-hash preserves scroll). NOT phone-tested —
+    only Imran's device counts.
 
 ## Standing rules — obey on every update
 

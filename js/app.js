@@ -2335,7 +2335,13 @@
   /* ---------------- boot ---------------- */
   function render() {
     var r = parseHash();
-    lastRenderedHash = location.hash || '#/';
+    var newHash = location.hash || '#/';
+    // In-place re-render (provider switch, TMDB key save/clear, late module
+    // load): the route didn't change, so keep the user's scroll position
+    // instead of jumping to top. Real navigations still scroll to top.
+    var keepScroll = (newHash === lastRenderedHash);
+    var savedY = keepScroll ? (window.scrollY || 0) : 0;
+    lastRenderedHash = newHash;
     if (r.view === 'landing') { renderLanding(); }
     else if (r.view === 'master') { renderMasterPage(); }
     else {
@@ -2349,6 +2355,7 @@
     // STEP 7 · CHUNK 1: consume any pending motion arrival.
     if (motion.pending) { runMotionArrival(); }
     wirePosterPreviews(); // STEP 7 · CHUNK 5: hover ambient previews
+    if (keepScroll && savedY > 0) { window.scrollTo(0, savedY); }
   }
 
   saveSettings(getSettings());

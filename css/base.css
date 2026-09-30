@@ -11,10 +11,11 @@
   --font-serif:"Newsreader",Georgia,"Times New Roman",serif;
 }
 *{box-sizing:border-box}
-html{scrollbar-color:var(--surface-3) var(--bg); -webkit-text-size-adjust:100%}
+html{scrollbar-color:var(--surface-3) var(--bg); -webkit-text-size-adjust:100%; overflow-x:clip}
 body{
   margin:0; min-height:100dvh; background:var(--bg); color:var(--text);
   font-family:var(--font-sans); line-height:1.45; -webkit-tap-highlight-color:transparent;
+  overflow-x:clip;
 }
 button,input{font:inherit; color:inherit}
 button{border:0; background:none; cursor:pointer}
