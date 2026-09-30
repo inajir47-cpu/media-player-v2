@@ -152,6 +152,14 @@
     return Math.min(100, Math.round((e.position / e.duration) * 100));
   }
 
+  /* Private hentai folders: hanime videos and hentai manga live in their
+   * own folders on the History and Watchlist pages, never mixed with each
+   * other or with the normal lists. Detection is by provider. */
+  function isHentaiAnime(e) { return !!e && e.provider === 'hanime'; }
+  function isHentaiManga(e) {
+    return !!e && (e.provider === 'nhentai' || e.provider === 'hitomi');
+  }
+
   window.MPV2 = window.MPV2 || {};
   window.MPV2.Watch = {
     keyFor: keyFor,
@@ -165,6 +173,8 @@
     getWatchlist: getWatchlist,
     isSaved: isSaved,
     toggleWatchlist: toggleWatchlist,
+    isHentaiAnime: isHentaiAnime,
+    isHentaiManga: isHentaiManga,
     fmtClock: fmtClock,
     fmtLeft: fmtLeft,
     progressPct: progressPct

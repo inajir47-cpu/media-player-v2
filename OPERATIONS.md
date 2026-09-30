@@ -780,3 +780,27 @@ Obey this on every update. Updated 2026-09-30.
     their own hanime details. Verified real Chromium 5/5: open 24 cards,
     scroll -> 48 (page 2), re-click closes, switch tag reloads. Committed
     locally, NOT pushed, NOT phone-tested.
+48. 2026-10-01 — Private hentai folders on History + Watchlist (Imran:
+    separate folders for hentai anime and hentai manga, never mixed; folder
+    looks like a normal anime poster but blurred with no name; Watchlist
+    button on the hanime info page).
+    js/watch-history.js: new isHentaiAnime(e) (provider 'hanime') and
+    isHentaiManga(e) (provider 'nhentai'/'hitomi'), exported on
+    window.MPV2.Watch. js/stream.js: playHanime() now passes
+    provider:'hanime' in the watch context so hanime history classifies
+    correctly (it is stored kind 'movie' but belongs to the animation
+    section, not Movies). js/anime-online.js: hanime details page gets a
+    wh-save Watchlist button next to Play (same pattern as stream.js
+    wireDetail; saves key 'hanime:'+slug, kind 'anime', provider 'hanime').
+    js/app.js: parseHash/renderShell/renderPage thread a sub route
+    (#/<sec>/history|watchlist/hentai-anime|hentai-manga); hentaiSplit()
+    pulls hentai items out of the normal lists; hfolderRow() shows the two
+    blurred folder cards at the top of the Animation History/Watchlist when
+    they have items; renderHentaiFolder() is the inside-folder view (back
+    link, normal item cards); historyForSection() keeps hanime out of the
+    Movies history. css/pages.css: .hfolder — poster-shaped card, image
+    blurred (blur 16px + dimmed), no title text, tiny play/book badge to
+    tell the two folders apart. Verified real Chromium 13/13: 2 folders on
+    History + Watchlist, main lists exclude hentai, folder views list the
+    right items, detail button saves/removes and persists. Committed
+    locally, NOT pushed, NOT phone-tested.

@@ -2025,6 +2025,38 @@
           ST.playHanime(slug, v.name || slug, v.poster_url || '');
       });
       mountTagBrowser(mount, slug);
+      // Watchlist save on the hanime info page (same wh-save pattern as
+      // stream.js wireDetail; manga info pages already have theirs).
+      (function () {
+        var W = window.MPV2 && window.MPV2.Watch;
+        var actions = mount.querySelector('.detail-actions');
+        if (!W || !actions || actions.querySelector('[data-ha-wl]')) return;
+        var key = 'hanime:' + slug;
+        var btn = document.createElement('button');
+        btn.type = 'button'; btn.className = 'wh-save'; btn.setAttribute('data-ha-wl', '1');
+        function refresh() {
+          if (!document.contains(btn)) {
+            document.removeEventListener('mpv2:history', refresh);
+            return;
+          }
+          var saved = W.isSaved(key);
+          btn.classList.toggle('saved', saved);
+          btn.innerHTML = icon('bookmark') +
+            '<span>' + (saved ? 'Saved' : 'Watchlist') + '</span>';
+          btn.setAttribute('aria-pressed', String(saved));
+          btn.setAttribute('aria-label', saved ? 'Remove from watchlist' : 'Add to watchlist');
+        }
+        btn.addEventListener('click', function () {
+          var nowSaved = W.toggleWatchlist({ key: key, kind: 'anime', title: v.name || slug,
+            poster: v.poster_url || '', href: location.hash, provider: 'hanime', pid: slug });
+          refresh();
+          if (window.MPV2 && typeof window.MPV2.toast === 'function')
+            window.MPV2.toast(nowSaved ? 'Saved to watchlist' : 'Removed from watchlist');
+        });
+        actions.appendChild(btn);
+        document.addEventListener('mpv2:history', refresh);
+        refresh();
+      })();
       window.scrollTo(0, 0);
     }
     HP.full(slug).then(function (d) {

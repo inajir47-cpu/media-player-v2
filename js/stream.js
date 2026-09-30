@@ -1555,7 +1555,7 @@
     // hanime (18+): play a single video by slug — no episode staging,
     // no provider dialog. isMovie hides episode navigation in the shell.
     playHanime: function (slug, title, poster) {
-      startWatch({ title: title || 'hanime video', poster: poster || '',
+      startWatch({ title: title || 'hanime video', poster: poster || '', provider: 'hanime',
         hanimeSlug: slug, isMovie: true }, 1, { kind: 'ha', name: 'hanime' }, 'Japanese');
     },
     // God Mode: direct reanime catalog search (English), normalized.

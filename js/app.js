@@ -202,7 +202,15 @@
     var tab = parts[1] || 'home';
     var all = sec.tabs.concat(sec.extras);
     var ok = all.some(function (t) { return t.id === tab; });
-    return { view: 'section', section: sec.id, tab: ok ? tab : 'home' };
+    if (!ok) tab = 'home';
+    // Private hentai folders: #/<section>/history/hentai-anime,
+    // #/<section>/history/hentai-manga, and the same under /watchlist.
+    var sub = null;
+    if ((tab === 'history' || tab === 'watchlist') && parts[2] &&
+        (parts[2] === 'hentai-anime' || parts[2] === 'hentai-manga')) {
+      sub = parts[2];
+    }
+    return { view: 'section', section: sec.id, tab: tab, sub: sub };
   }
 
   /* ---------------- landing ---------------- */
@@ -268,9 +276,9 @@
     return $('#view');
   }
 
-  function renderShell(sec, tab) {
+  function renderShell(sec, tab, sub) {
     document.title = TITLES[tab] + ' · ' + sec.name + ' · Media Player V2';
-    renderPage(sec, tab, mountShell(sec, tab));
+    renderPage(sec, tab, mountShell(sec, tab), sub);
     wireSwipeTabs(sec, tab); // STEP 7 · CHUNK 1: swipe between tabs
     window.scrollTo(0, 0);
   }
@@ -303,7 +311,7 @@
   /* STEP 5b: dedicated Watchlist page, reached from the top-bar bookmark.
    * Merges the local catalogue watchlist with titles saved from streaming
    * detail pages (Save to Watchlist). */
-  function renderWatchlist(sec) {
+  function renderWatchlist(sec, sub) {
     var ids = getWatchlist();
     var local = ids.map(function (id) { return window.MPV2.findTitle(sec.id, id); })
       .filter(function (t) { return !!t; });
@@ -313,19 +321,25 @@
       var m = /^#\/([^/]+)\//.exec(it.href || '');
       return m ? m[1] === sec.id : true;
     });
-    var total = local.length + online.length;
-    if (!total) {
+    var split = hentaiSplit(online);
+    if (sub) {
+      return renderHentaiFolder(sec, 'watchlist', sub, sub === 'hentai-anime' ? split.anime : split.manga);
+    }
+    var rest = split.rest;
+    var total = local.length + rest.length;
+    var folders = sec.id === 'animation' ? hfolderRow(sec, 'watchlist', split) : '';
+    if (!total && !folders) {
       return pageHead(sec, 'Watchlist', 'Titles you save will appear here.') +
         emptyState('bookmark', 'Your watchlist is empty', 'Add a title from its details page, then it will be ready here.');
     }
-    var out = pageHead(sec, 'Watchlist', total + ' saved title' + (total === 1 ? '' : 's') + '.');
+    var out = pageHead(sec, 'Watchlist', total + ' saved title' + (total === 1 ? '' : 's') + '.') + folders;
     if (local.length) {
       out += '<div class="poster-grid cards">' + local.map(function (t) { return posterCard(sec, t); }).join('') + '</div>';
     }
-    if (online.length) {
+    if (rest.length) {
       out += '<section class="row"><div class="row-head"><h2>Saved from streaming</h2>' +
-        '<span class="muted-link">' + online.length + ' title' + (online.length === 1 ? '' : 's') + '</span></div>' +
-        '<div class="poster-grid cards">' + online.map(function (it) {
+        '<span class="muted-link">' + rest.length + ' title' + (rest.length === 1 ? '' : 's') + '</span></div>' +
+        '<div class="poster-grid cards">' + rest.map(function (it) {
           return '<a class="poster-card" href="' + esc(it.href || '#/' + sec.id + '/home') + '">' +
             '<span class="poster-img">' +
               (it.poster ? '<img src="' + esc(it.poster) + '" alt="' + esc(it.title || '') + ' poster" loading="lazy">' : '') +
@@ -389,28 +403,90 @@
       '</button>' +
     '</article>';
   }
-  /* Watch-history entries for one section: movies -> movies, everything else -> anime. */
+  /* Private hentai folders for the History and Watchlist pages. Two folders
+   * that never mix: hentai anime (provider 'hanime') and hentai manga
+   * (providers 'nhentai'/'hitomi'). The folder card is a blurred poster
+   * with no name; the items inside show normally. */
+  function hentaiSplit(items) {
+    var W = window.MPV2.Watch;
+    var anime = [], manga = [], rest = [];
+    (items || []).forEach(function (e) {
+      if (W && W.isHentaiAnime(e)) anime.push(e);
+      else if (W && W.isHentaiManga(e)) manga.push(e);
+      else rest.push(e);
+    });
+    return { anime: anime, manga: manga, rest: rest };
+  }
+  function hfolderCard(sec, tab, kind, items) {
+    if (!items.length) return '';
+    var first = items[0] || {};
+    return '<a class="hfolder" href="#/' + sec.id + '/' + tab + '/' + kind + '" aria-label="Private folder">' +
+      '<span class="hfolder-poster">' +
+      (first.poster ? '<img src="' + esc(first.poster) + '" alt="" loading="lazy">' : '') +
+      '</span><span class="hfolder-badge">' + icon(kind === 'hentai-anime' ? 'play' : 'book') + '</span></a>';
+  }
+  function hfolderRow(sec, tab, split) {
+    var cards = hfolderCard(sec, tab, 'hentai-anime', split.anime) +
+      hfolderCard(sec, tab, 'hentai-manga', split.manga);
+    if (!cards) return '';
+    return '<div class="hfolder-row">' + cards + '</div>';
+  }
+  function renderHentaiFolder(sec, tab, sub, list) {
+    var isAnime = sub === 'hentai-anime';
+    var out = '<a class="back-link" href="#/' + sec.id + '/' + tab + '">' +
+      icon('arrowLeft') + '<span>' + (tab === 'history' ? 'History' : 'Watchlist') + '</span></a>' +
+      pageHead(sec, isAnime ? 'Hentai Anime' : 'Hentai Manga',
+        list.length ? list.length + ' title' + (list.length === 1 ? '' : 's') + ' in this private folder.'
+                    : 'This private folder is empty.');
+    if (!list.length) {
+      return out + emptyState('folder', 'Nothing here',
+        'Titles you ' + (tab === 'history' ? 'watch' : 'save') + ' will appear in this folder.');
+    }
+    if (tab === 'history') {
+      out += '<div class="rw-list">' +
+        list.map(function (e) { return historyCardHtml(sec, e, true); }).join('') + '</div>';
+    } else {
+      out += '<div class="poster-grid cards">' + list.map(function (it) {
+        return '<a class="poster-card" href="' + esc(it.href || '#/' + sec.id + '/home') + '">' +
+          '<span class="poster-img">' +
+          (it.poster ? '<img src="' + esc(it.poster) + '" alt="" loading="lazy">' : '') +
+          '</span><span class="poster-title">' + esc(it.title || 'Untitled') + '</span>' +
+          '<span class="poster-meta">' + (isAnime ? 'Hentai anime' : 'Hentai manga') + '</span></a>';
+      }).join('') + '</div>';
+    }
+    return out;
+  }
+  /* Watch-history entries for one section: movies -> movies, everything else -> anime.
+   * hanime videos are stored as kind 'movie' but belong to the animation section. */
   function historyForSection(secId) {
     var W = window.MPV2.Watch;
     if (!W) return [];
     var wantMovie = secId === 'movies';
     return W.getHistory().filter(function (e) {
+      if (W.isHentaiAnime(e)) return !wantMovie;
       return wantMovie ? e.kind === 'movie' : e.kind !== 'movie';
     });
   }
-  function renderHistoryPage(sec) {
+  function renderHistoryPage(sec, sub) {
+    var W = window.MPV2.Watch;
     var items = historyForSection(sec.id);
-    var head = pageHead(sec, 'History', items.length
-      ? items.length + ' title' + (items.length === 1 ? '' : 's') + ' in your viewing activity.'
+    var split = hentaiSplit(items);
+    if (sub) {
+      return renderHentaiFolder(sec, 'history', sub, sub === 'hentai-anime' ? split.anime : split.manga);
+    }
+    var main = split.rest;
+    var folders = sec.id === 'animation' ? hfolderRow(sec, 'history', split) : '';
+    var head = pageHead(sec, 'History', main.length
+      ? main.length + ' title' + (main.length === 1 ? '' : 's') + ' in your viewing activity.'
       : 'Your viewing activity.');
-    if (!items.length) {
+    if (!main.length && !folders) {
       return head + emptyState('history', 'Nothing watched yet', 'Completed and in-progress titles will appear here.');
     }
-    var cards = items.map(function (e) { return historyCardHtml(sec, e, true); }).join('');
-    return head +
+    return head + folders +
       '<div class="row-head"><span class="muted-link">Latest first</span>' +
       '<button type="button" class="link-btn" id="clearHistory">Clear history</button></div>' +
-      '<div class="rw-list">' + cards + '</div>';
+      (main.length ? '<div class="rw-list">' +
+        main.map(function (e) { return historyCardHtml(sec, e, true); }).join('') + '</div>' : '');
   }
 
   /* STEP 7 · CHUNK 1: section-home markup as a pure string, shared by the
@@ -487,7 +563,7 @@
     });
   }
 
-  function renderPage(sec, tab, root) {
+  function renderPage(sec, tab, root, sub) {
     var key = sec.id + '/' + tab;
     if (customPages[key]) { customPages[key](sec, root); return; }
 
@@ -524,11 +600,11 @@
           '</div></section>' +
         '<div class="file-results" id="fileResults"></div>';
     } else if (tab === 'history') {
-      html = renderHistoryPage(sec);
+      html = renderHistoryPage(sec, sub);
     } else if (tab === 'settings') {
       html = renderSettings(sec);
     } else if (tab === 'watchlist') {
-      html = renderWatchlist(sec);
+      html = renderWatchlist(sec, sub);
     } else {
       // anime / manga / bollywood / hollywood / webseries — catalogue rows
       html = pageHead(sec, TITLES[tab], TITLES[tab] + ' library.');
@@ -2323,7 +2399,7 @@
       if (r.view === 'detail') { renderDetail(sec, r.item); }
       else if (r.view === 'onlinedetail') { window.MPV2.renderOnlineDetail(r.section, r.provider, r.id, r.mediaType); }
       else if (r.view === 'onlinecharacter') { window.MPV2.renderOnlineCharacter(r.section, r.provider, r.id, r.name); }
-      else { renderShell(sec, r.tab); }
+      else { renderShell(sec, r.tab, r.sub); }
     }
     // STEP 7 · CHUNK 1: consume any pending motion arrival.
     if (motion.pending) { runMotionArrival(); }
