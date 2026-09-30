@@ -287,7 +287,12 @@
     R.pagesEl.scrollTop = 0;
     syncLangToggle();
     updateChrome();
-    chapterPages(ch.id).then(function (urls) {
+    /* Providers with pre-resolved page URLs (e.g. nhentai galleries) skip
+       the MangaDex at-home resolution entirely. */
+    var pagesPromise = (ch.pages && ch.pages.length)
+      ? Promise.resolve(ch.pages)
+      : chapterPages(ch.id);
+    pagesPromise.then(function (urls) {
       if (!R || R.chapter.id !== ch.id) return;
       R.pages = urls;
       var html = '';

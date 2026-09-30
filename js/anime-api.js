@@ -1037,6 +1037,12 @@
   function godSettled(p) {
     return p.then(function (v) { return v || []; }, function () { return []; });
   }
+  // nhentai is adult-only: it only searches when the 18+ Settings opt-in is
+  // on (same rule as adult AniList titles: hidden from search otherwise).
+  function adultOptIn() {
+    try { return !!JSON.parse(localStorage.getItem('mpv2_settings_v1') || '{}').adult; }
+    catch (e) { return false; }
+  }
   function godGlobalSearch(fnName, q) {
     return new Promise(function (res) {
       try {
@@ -1097,6 +1103,9 @@
       }))),
       godSettled(godTimeout(mdGodSearch(query)))
     ];
+    // nhentai (adult manga): 18+ opt-in only. Direct provider search, same
+    // isolation as the other God Mode jobs.
+    if (adultOptIn()) jobs.push(godSettled(godTimeout(godGlobalSearch('nhSearch', query))));
     return Promise.all(jobs).then(function (lists) {
       var out = [];
       lists.forEach(function (l) {

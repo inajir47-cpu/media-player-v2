@@ -1148,7 +1148,7 @@
   // tag plus language/audio pills reusing the .st-b badge system.
   var GOD_SERVER_CLASS = {
     'Hindi-1': 'sv-hindi1', 'Hindi-2': 'sv-hindi2',
-    'Reanime': 'sv-reanime', 'MangaDex': 'sv-mangadex'
+    'Reanime': 'sv-reanime', 'MangaDex': 'sv-mangadex', 'nhentai': 'sv-nhentai'
   };
   function langBadgeCls(b) {
     if (/hindi/i.test(b)) return 'st-hi';
@@ -1162,6 +1162,8 @@
     else if (ref.kind === 'reanime')
       attrs += ' data-god-anilist="' + (ref.anilistId || '') + '" data-god-title="' + esc(item.title) + '"';
     else if (ref.kind === 'mangadex') attrs += ' data-god-uuid="' + esc(ref.uuid || '') + '"';
+    else if (ref.kind === 'nhentai')
+      attrs += ' data-god-nhid="' + esc(String(ref.id || '')) + '" data-god-title="' + esc(item.title) + '"';
     var badges = (item.langs || []).concat(item.audio || []).map(function (b) {
       return '<i class="st-b ' + langBadgeCls(b) + '">' + esc(String(b).toUpperCase()) + '</i>';
     }).join('');
@@ -1171,6 +1173,7 @@
       ' poster" loading="lazy">' +
       '<span class="server-tag ' + (GOD_SERVER_CLASS[item.server] || '') + '">' +
       esc(item.server) + '</span>' +
+      (ref.kind === 'nhentai' ? '<span class="adult18 god-adult">18+</span>' : '') +
       (badges ? '<span class="god-langbadges">' + badges + '</span>' : '') + '</span>' +
       '<span class="poster-title">' + esc(item.title) + '</span>' +
       '<span class="poster-meta">' + esc(meta) + '</span></button>';
@@ -1217,6 +1220,22 @@
         var t2 = card.getAttribute('data-god-title');
         if (t2 && window.MPV2.Stream) window.MPV2.Stream.playEpisode({ title: t2 }, 1);
       }
+    } else if (kind === 'nhentai') {
+      // Adult gallery: 18+ safety warning every time (same as adult AniList
+      // titles), then straight into the Manga Reader with pre-resolved pages.
+      var nhid = card.getAttribute('data-god-nhid');
+      var nht = card.getAttribute('data-god-title') || 'nhentai gallery';
+      var NHP = window.MPV2 && window.MPV2.NHentai;
+      var MR2 = window.MPV2 && window.MPV2.MangaReader;
+      if (!nhid || !NHP || !MR2) return;
+      adultWarnModal({ title: nht }, function () {
+        if (window.MPV2.toast) window.MPV2.toast('Opening gallery\u2026');
+        NHP.galleryPages(nhid).then(function (p) {
+          if (!p || !p.pages || !p.pages.length) throw new Error('no pages');
+          MR2.openReader({ uuid: 'nhentai:' + nhid, ctx: {},
+            chapter: { id: 'nh-' + nhid, ch: '1', title: p.title, pages: p.pages } });
+        }).catch(function () { if (window.MPV2.toast) window.MPV2.toast('Could not open this gallery.'); });
+      });
     }
   }
 
