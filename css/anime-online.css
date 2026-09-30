@@ -918,3 +918,44 @@ button.trailer-btn { cursor: pointer; font-family: inherit; }
 .ext-confirm-cancel:active { opacity: .7; }
 .ext-confirm-ok { background: #a855f7; border-color: #a855f7; color: #fff; }
 .ext-confirm-ok:active { opacity: .85; }
+
+/* Search content-type filter chips */
+.search-filters { display: flex; gap: 8px; overflow-x: auto; padding: 12px 2px 4px;
+  scrollbar-width: none; }
+.search-filters::-webkit-scrollbar { display: none; }
+.sf-chip { flex: 0 0 auto; padding: 8px 16px; border-radius: 999px; font-size: 13px;
+  font-weight: 600; font-family: inherit; cursor: pointer; color: #a1a1aa;
+  background: #101013; border: 1px solid #232326; transition: all .15s ease; }
+.sf-chip.active { color: #fff; background: #a855f7; border-color: #a855f7; }
+.sf-chip:not(.active):active { opacity: .7; }
+
+/* God Mode toggle */
+.god-row { display: flex; align-items: center; gap: 10px; margin: 2px 0 4px; flex-wrap: wrap; }
+.god-toggle { display: flex; align-items: center; gap: 8px; background: #101013;
+  border: 1px solid #2a2a30; border-radius: 999px; padding: 7px 8px 7px 12px;
+  color: #e4e4e7; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.god-bolt { font-size: 15px; filter: grayscale(1); opacity: .55; }
+.god-toggle.on { border-color: #a855f7; background: rgba(168,85,247,.12); }
+.god-toggle.on .god-bolt { filter: none; opacity: 1; }
+.god-switch { width: 36px; height: 20px; border-radius: 999px; background: #26262c;
+  position: relative; transition: background .15s ease; flex: none; }
+.god-toggle.on .god-switch { background: #a855f7; }
+.god-knob { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+  border-radius: 50%; background: #fff; transition: left .15s ease; }
+.god-toggle.on .god-knob { left: 18px; }
+.god-sub { margin: 0; font-size: 12px; color: #8e8e96; }
+.god-count { font-size: 12px; color: #8e8e96; margin: 2px 0 0; }
+
+/* God Mode result cards: server tag + language/dub pills */
+.god-card { background: none; border: 0; padding: 0; font: inherit;
+  text-align: left; cursor: pointer; }
+.server-tag { position: absolute; top: 8px; right: 8px; z-index: 3; font-size: 9px;
+  font-weight: 800; letter-spacing: .5px; padding: 3px 7px; border-radius: 6px;
+  color: #fff; background: rgba(8,8,12,.65); border: 1px solid rgba(255,255,255,.25);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); pointer-events: none; }
+.server-tag.sv-hindi1 { border-color: rgba(251,191,36,.8); color: #fde68a; }
+.server-tag.sv-hindi2 { border-color: rgba(249,115,22,.8); color: #fed7aa; }
+.server-tag.sv-reanime { border-color: rgba(96,165,250,.8); color: #bfdbfe; }
+.server-tag.sv-mangadex { border-color: rgba(52,211,153,.8); color: #a7f3d0; }
+.god-langbadges { position: absolute; left: 8px; bottom: 8px; z-index: 3;
+  display: flex; gap: 4px; pointer-events: none; }

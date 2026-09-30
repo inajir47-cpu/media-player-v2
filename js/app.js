@@ -466,10 +466,12 @@
       }
     } else if (tab === 'search') {
       html = pageHead(sec, 'Search', 'Find titles across ' + sec.name.toLowerCase() + '.') +
+        (window.MPV2 && window.MPV2.godToggleHtml ? window.MPV2.godToggleHtml() : '') +
         '<div class="search-box">' + icon('search') +
           '<input id="searchInput" type="search" autocomplete="off" placeholder="Search titles…" aria-label="Search titles">' +
           '<button class="clear-btn hidden" id="clearSearch" aria-label="Clear search">' + icon('x') + '</button>' +
         '</div>' +
+        (window.MPV2 && window.MPV2.searchFilterChipsHtml ? window.MPV2.searchFilterChipsHtml() : '') +
         '<div id="searchState">' + emptyState('search', 'Search is ready', 'Enter a title to use the search flow.') + '</div>';
     } else if (tab === 'local') {
       html = pageHead(sec, 'Local Files', 'Play media from this device.') +
@@ -1827,7 +1829,7 @@
     // (anime + movies + manga); other sections keep the local shell.
     var si = $('#searchInput', root), cs = $('#clearSearch', root);
     if (si && cs) {
-      var searchTimer = null, searchSeq = 0;
+      var searchTimer = null, searchSeq = 0, lastSearch = null;
       // Lazy check: on a deep-link first render this wiring can run before the
       // online scripts below app.js have executed; by the time the user types,
       // they are always loaded.
@@ -1835,6 +1837,77 @@
         return sec.id === 'animation' && window.MPV2 &&
           window.MPV2.AnimeAPI && window.MPV2.searchResultsHtml;
       }
+      function renderSearchResults() {
+        var box = $('#searchState', root);
+        if (!box || !lastSearch) return;
+        box.innerHTML = lastSearch.god
+          ? window.MPV2.godResultsHtml(lastSearch.q, lastSearch.res)
+          : window.MPV2.searchResultsHtml(lastSearch.q, lastSearch.res);
+      }
+      // Search enhancements (God toggle + filter chips) are rendered by the
+      // online module, which parses AFTER app.js; the boot render runs during
+      // app.js parse, so inject them here once every script has parsed.
+      function wireSearchEnhancements() {
+        try {
+        if (!window.MPV2) return;
+        var sbox = root.querySelector('.search-box');
+        if (!sbox) return;
+        if (window.MPV2.godToggleHtml && !root.querySelector('#godToggle'))
+          sbox.insertAdjacentHTML('beforebegin', window.MPV2.godToggleHtml());
+        if (window.MPV2.searchFilterChipsHtml && !root.querySelector('#searchFilters'))
+          sbox.insertAdjacentHTML('afterend', window.MPV2.searchFilterChipsHtml());
+        // God Mode toggle: flip the engine and re-run the current query.
+        var godT = root.querySelector('#godToggle');
+        if (godT && !godT.getAttribute('data-wired') && window.MPV2.getGodMode && window.MPV2.setGodMode) {
+          godT.setAttribute('data-wired', '1');
+          godT.addEventListener('click', function () {
+            var on = window.MPV2.setGodMode(!window.MPV2.getGodMode());
+            godT.classList.toggle('on', on);
+            godT.setAttribute('aria-pressed', on ? 'true' : 'false');
+            var sub = root.querySelector('.god-sub');
+            if (sub) sub.textContent = on
+              ? 'Searching provider servers directly.'
+              : 'Search provider servers directly, bypassing meta-APIs.';
+            if (si.value.trim().length >= 3) si.dispatchEvent(new Event('input'));
+          });
+        }
+        // Content-type filter chips: instant re-render of the last results.
+        var sfRow = root.querySelector('#searchFilters');
+        if (sfRow && !sfRow.getAttribute('data-wired') && window.MPV2.setSearchFilter) {
+          sfRow.setAttribute('data-wired', '1');
+          sfRow.addEventListener('click', function (e) {
+            var chip = e.target.closest ? e.target.closest('[data-sf]') : null;
+            if (!chip || !window.MPV2.setSearchFilter) return;
+            window.MPV2.setSearchFilter(chip.getAttribute('data-sf'));
+            Array.prototype.forEach.call(sfRow.querySelectorAll('[data-sf]'), function (c) {
+              var on = c === chip;
+              c.classList.toggle('active', on);
+              c.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+            renderSearchResults();
+          });
+        }
+        } catch (err) { /* search enhancements are best-effort on first paint */ }
+      }
+      wireSearchEnhancements();
+      // The boot render runs during app.js parse, before the online scripts
+      // below it execute; a 0ms timeout can also fire in a script-download gap
+      // before they run. Retry on window load and with a bounded poll until
+      // the enhancement nodes are present. All idempotent (existence checks +
+      // data-wired flags), so repeated calls are safe.
+      var wseTries = 0;
+      (function wsePoll() {
+        wireSearchEnhancements();
+        if ((!root.querySelector('#godToggle') || !root.querySelector('#searchFilters')) && wseTries++ < 100 && root.isConnected)
+          setTimeout(wsePoll, 100);
+      })();
+      if (document.readyState !== 'complete')
+        window.addEventListener('load', wireSearchEnhancements);
+      // God Mode card taps: delegated (results re-render on every keystroke).
+      root.addEventListener('click', function (e) {
+        var card = e.target.closest ? e.target.closest('[data-god-kind]') : null;
+        if (card && window.MPV2.openGodCard) window.MPV2.openGodCard(card);
+      });
       si.addEventListener('input', function () {
         var q = si.value.trim();
         cs.classList.toggle('hidden', !q);
@@ -1847,10 +1920,12 @@
         }
         clearTimeout(searchTimer);
         if (!q) {
+          lastSearch = null;
           box.innerHTML = emptyState('search', 'Search is ready', 'Search anime, movies and manga.');
           return;
         }
         if (q.length < 3) {
+          lastSearch = null;
           box.innerHTML = emptyState('search', 'Keep typing', 'Enter at least 3 characters to search.');
           return;
         }
@@ -1859,9 +1934,20 @@
           var API = window.MPV2.AnimeAPI;
           box.innerHTML = '<div class="poster-grid online-grid">' +
             window.MPV2.onlineSkeletons(6) + '</div>';
-          API.search(API.getProvider(), q).then(function (res) {
+          var god = window.MPV2.getGodMode && window.MPV2.getGodMode() &&
+                      typeof API.godSearch === 'function';
+          var p = god
+            ? API.godSearch(q).then(function (items) { return { god: true, items: items }; })
+            : API.search(API.getProvider(), q).then(function (res) { return { god: false, res: res }; });
+          p.then(function (out) {
             if (my !== searchSeq || !box.isConnected) return;
-            box.innerHTML = window.MPV2.searchResultsHtml(q, res);
+            if (out.god) {
+              lastSearch = { q: q, god: true, res: out.items };
+              box.innerHTML = window.MPV2.godResultsHtml(q, out.items);
+            } else {
+              lastSearch = { q: q, res: out.res };
+              box.innerHTML = window.MPV2.searchResultsHtml(q, out.res);
+            }
           }).catch(function (err) {
             if (my !== searchSeq || !box.isConnected) return;
             box.innerHTML = window.MPV2.onlineErrorHtml(err);

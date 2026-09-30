@@ -1472,6 +1472,23 @@
     // Direct playback for one episode (used by Recently Watched continue).
     playEpisode: function (ctxLike, n) {
       checkEpisodeStaged(ctxLike, n, function (avail) { openProviderDialog(ctxLike, n, avail); });
+    },
+    // God Mode: direct reanime catalog search (English), normalized.
+    searchReanime: function (q) {
+      return wGetJSON(REANIME + '/api/v1/search?q=' + encodeURIComponent(q) + '&limit=12')
+        .then(function (d) {
+          return (d.results || []).map(function (r) {
+            if (!r || !(r.title || r.name)) return null;
+            var dub = r.has_dub || r.hasDub || /dub/i.test(r.title || '');
+            return {
+              title: r.title || r.name, image: r.poster || r.image || r.cover || '',
+              type: (r.type === 'movie' || /movie/i.test(r.format || '')) ? 'movie' : 'series',
+              server: 'Reanime', langs: ['English'],
+              audio: dub ? ['Sub', 'Dub'] : ['Sub'],
+              ref: { kind: 'reanime', animeId: r.anime_id, anilistId: r.anilist_id }
+            };
+          }).filter(Boolean);
+        }, function () { return []; });
     }
   };
 

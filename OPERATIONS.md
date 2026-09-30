@@ -99,8 +99,8 @@ Obey this on every update. Updated 2026-09-30.
    Discover/genre, home recommendations, detail recommendations, hero), not
    just search. Also: home "Recently Watched" cards have the X remove button
    (same instant-remove + live refresh + toast as the History tab).
-10. **18+ badges + Recently Viewed remove**: 2026-09-30 (uncommitted at write
-    time). `recordView()` now persists `isAdult`, so Recently Viewed /
+10. **18+ badges + Recently Viewed remove**: 2026-09-30 (commit `182d3e2`).
+    `recordView()` now persists `isAdult`, so Recently Viewed /
     Recently Viewed Manga cards render the 18+ badge (moved top-left; the X
     sits top-right). TOP 010 rows and hero slides also badge adult titles when
     the opt-in is ON. Home "Recently Viewed" and Manga-tab "Recently Viewed
@@ -108,8 +108,12 @@ Obey this on every update. Updated 2026-09-30.
     removal (section hides when empty) + toast, never navigates. Bug caught in
     testing: the section must be captured *before* `card.remove()` detaches the
     button from the DOM, otherwise `closest('section')` returns null.
-11. **External link confirmation modal**: 2026-09-30 (uncommitted at write
-    time). One document-level delegated handler in `js/anime-online.js`
+    Follow-up 2026-09-30: an earlier debug claimed the emptied manga section
+    stayed in the DOM — **could not reproduce** on current code. Chromium
+    re-verified: removing the last manga card removes the whole section from
+    the DOM; removing one of two keeps the section with the survivor; manga
+    removal never touches the anime store (storage isolation confirmed).
+11. **External link confirmation modal**: 2026-09-30 (commit `551f686`). One document-level delegated handler in `js/anime-online.js`
     (`wireExternalConfirm()`) intercepts every absolute http(s) link — trailer
     button, episode globe, markdown links in descriptions/reviews — before it
     navigates. Shows an OLED-styled modal: YouTube links get "This will open
@@ -117,6 +121,23 @@ Obey this on every update. Updated 2026-09-30.
     website (<domain>)." Cancel/backdrop/Esc dismiss; only Proceed calls
     `window.open(url, '_blank', 'noopener')`. Internal `#/...` hash links are
     never intercepted. `data-no-confirm` on an anchor bypasses the modal.
+12. **God Mode + search filters**: 2026-09-30 (uncommitted at write time —
+    local only, NOT pushed/deployed). Animation search has a prominent God
+    Mode toggle (persisted `mpv2_godmode_v1`) and All / Movie / Web Series /
+    Manga filter chips (persisted `mpv2_search_filter_v1`). God Mode bypasses
+    AniList/Jikan and searches provider servers directly in parallel with
+    per-provider timeout + failure isolation: Hindi-1, Hindi-2, Reanime
+    (EN sub/dub), MangaDex (native safe/suggestive ratings only). Every
+    direct result shows its server tag and language/audio badges (HINDI/DUB,
+    ENGLISH/SUB/DUB, EN/JA). Routing: Hindi → existing title-match provider
+    dialog; Reanime → AniList detail hash when an ID exists; MangaDex →
+    earliest EN chapter in the reader. Timing lesson: app.js's boot `render()`
+    runs during its own parse, before the online scripts below it execute, so
+    the toggle/chips are injected by an idempotent bounded poll
+    (`wireSearchEnhancements`, ≤10s) + window-load hook, not a single
+    `setTimeout(0)` — the 0ms timer can fire in a script-download gap before
+    the helpers exist. Verified: jsdom harness 41/41, real Chromium 22/22
+    (screenshot `your_files/media-player-v2-backup/v2-godmode-results.png`).
 
 ## Standing rules — obey on every update
 

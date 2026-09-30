@@ -902,10 +902,50 @@
   // Live search across anime (incl. movies) + manga, rendered by the app's
   // default Search tab (#/animation/search).
 
-  function searchResultsHtml(q, res) {
-    var a = hideAdult(res.anime), m = hideAdult(res.manga);
+  // Content-type filter for search results: all | movie | series | manga.
+  var LS_SEARCH_FILTER = 'mpv2_search_filter_v1';
+  var SEARCH_FILTERS = ['all', 'movie', 'series', 'manga'];
+  function getSearchFilter() {
+    try {
+      var f = localStorage.getItem(LS_SEARCH_FILTER);
+      return SEARCH_FILTERS.indexOf(f) !== -1 ? f : 'all';
+    } catch (e) { return 'all'; }
+  }
+  function setSearchFilter(f) {
+    if (SEARCH_FILTERS.indexOf(f) === -1) f = 'all';
+    try { localStorage.setItem(LS_SEARCH_FILTER, f); } catch (e) {}
+    return f;
+  }
+  function searchFilterChipsHtml() {
+    var cur = getSearchFilter();
+    var labels = { all: 'All', movie: 'Movie', series: 'Web Series', manga: 'Manga' };
+    return '<div class="search-filters" id="searchFilters" role="tablist" aria-label="Filter results by type">' +
+      SEARCH_FILTERS.map(function (f) {
+        return '<button type="button" role="tab" aria-selected="' + (f === cur) + '" data-sf="' + f + '"' +
+          ' class="sf-chip' + (f === cur ? ' active' : '') + '">' + labels[f] + '</button>';
+      }).join('') + '</div>';
+  }
+  // Filter predicate shared by normal (meta-API) and God Mode results.
+  // Normal items: {format, mediaType}; God Mode items: {type:'movie'|'series'|'manga'}.
+  function matchSearchFilter(item, filter) {
+    if (!filter || filter === 'all') return true;
+    var t = item.type ||
+      (item.mediaType === 'MANGA' ? 'manga' : (item.format === 'MOVIE' ? 'movie' : 'series'));
+    return t === filter;
+  }
+
+  function searchResultsHtml(q, res, filter) {
+    var f = filter || getSearchFilter();
+    var a = hideAdult(res.anime).filter(function (it) { return matchSearchFilter(it, f); });
+    var m = hideAdult(res.manga).filter(function (it) { return matchSearchFilter(it, f); });
     if (!a.length && !m.length)
-      return emptyState('search', 'No results', 'Try a different title.');
+      return emptyState('search', 'No results', 'Try a different title or filter.');
+    // With a type filter active, merge into one grid instead of two sections.
+    if (f !== 'all') {
+      var items = a.concat(m);
+      return '<div class="online-search-head"><h3>Results for &ldquo;' + esc(q) + '&rdquo;</h3></div>' +
+        '<div class="poster-grid online-grid">' + items.map(onlineCard).join('') + '</div>';
+    }
     return '<div class="online-search-head"><h3>Results for &ldquo;' + esc(q) + '&rdquo;</h3></div>' +
       (a.length ? '<p class="online-sub2">Anime &amp; movies</p>' +
         '<div class="poster-grid online-grid">' + a.map(onlineCard).join('') + '</div>' : '') +
@@ -1077,7 +1117,114 @@
 
   // Shared with the app's default Search tab.
   window.MPV2.onlineCard = onlineCard;
+  // God Mode: bypass meta-APIs, search provider servers directly. Persisted.
+  var LS_GODMODE = 'mpv2_godmode_v1';
+  function getGodMode() {
+    try { return localStorage.getItem(LS_GODMODE) === '1'; }
+    catch (e) { return false; }
+  }
+  function setGodMode(on) {
+    try { localStorage.setItem(LS_GODMODE, on ? '1' : '0'); } catch (e) {}
+    return !!on;
+  }
+  function godToggleHtml() {
+    var on = getGodMode();
+    return '<div class="god-row"><button type="button" id="godToggle" class="god-toggle' +
+      (on ? ' on' : '') + '" aria-pressed="' + on + '" aria-label="Toggle God Mode direct provider search">' +
+      '<span class="god-bolt">⚡</span><span class="god-label">God Mode</span>' +
+      '<span class="god-switch"><span class="god-knob"></span></span></button>' +
+      '<p class="god-sub">' + (on
+        ? 'Searching provider servers directly.'
+        : 'Search provider servers directly, bypassing meta-APIs.') + '</p></div>';
+  }
+
   window.MPV2.searchResultsHtml = searchResultsHtml;
+  window.MPV2.searchFilterChipsHtml = searchFilterChipsHtml;
+  window.MPV2.getSearchFilter = getSearchFilter;
+  window.MPV2.setSearchFilter = setSearchFilter;
+  window.MPV2.matchSearchFilter = matchSearchFilter;
+  /* ------------------------- God Mode results ------------------------- */
+  // Direct provider-server results. Each card carries a color-coded server
+  // tag plus language/audio pills reusing the .st-b badge system.
+  var GOD_SERVER_CLASS = {
+    'Hindi-1': 'sv-hindi1', 'Hindi-2': 'sv-hindi2',
+    'Reanime': 'sv-reanime', 'MangaDex': 'sv-mangadex'
+  };
+  function langBadgeCls(b) {
+    if (/hindi/i.test(b)) return 'st-hi';
+    if (/dub/i.test(b)) return 'st-dub';
+    return 'st-sub';
+  }
+  function godCard(item) {
+    var ref = item.ref || {};
+    var attrs = ' data-god-kind="' + ref.kind + '"';
+    if (ref.kind === 'hindi') attrs += ' data-god-title="' + esc(item.title) + '"';
+    else if (ref.kind === 'reanime')
+      attrs += ' data-god-anilist="' + (ref.anilistId || '') + '" data-god-title="' + esc(item.title) + '"';
+    else if (ref.kind === 'mangadex') attrs += ' data-god-uuid="' + esc(ref.uuid || '') + '"';
+    var badges = (item.langs || []).concat(item.audio || []).map(function (b) {
+      return '<i class="st-b ' + langBadgeCls(b) + '">' + esc(String(b).toUpperCase()) + '</i>';
+    }).join('');
+    var meta = item.type === 'movie' ? 'Movie' : item.type === 'manga' ? 'Manga' : 'Web Series';
+    return '<button type="button" class="poster-card online-card god-card"' + attrs + '>' +
+      '<span class="poster-img"><img src="' + esc(item.image) + '" alt="' + esc(item.title) +
+      ' poster" loading="lazy">' +
+      '<span class="server-tag ' + (GOD_SERVER_CLASS[item.server] || '') + '">' +
+      esc(item.server) + '</span>' +
+      (badges ? '<span class="god-langbadges">' + badges + '</span>' : '') + '</span>' +
+      '<span class="poster-title">' + esc(item.title) + '</span>' +
+      '<span class="poster-meta">' + esc(meta) + '</span></button>';
+  }
+  function godResultsHtml(q, items, filter) {
+    var f = filter || getSearchFilter();
+    var list = (items || []).filter(function (it) { return matchSearchFilter(it, f); });
+    if (!list.length)
+      return emptyState('search', 'No results', 'Try a different title or filter.');
+    return '<div class="online-search-head"><h3>Results for &ldquo;' + esc(q) + '&rdquo;</h3>' +
+      '<p class="god-count">' + list.length + ' result' + (list.length === 1 ? '' : 's') +
+      ' from provider servers</p></div>' +
+      '<div class="poster-grid online-grid">' + list.map(godCard).join('') + '</div>';
+  }
+  // Tap routing for God Mode cards (delegated from the search view).
+  function openGodCard(card) {
+    if (!card) return;
+    var kind = card.getAttribute('data-god-kind');
+    if (kind === 'mangadex') {
+      var uuid = card.getAttribute('data-god-uuid');
+      var MR = window.MPV2 && window.MPV2.MangaReader;
+      if (!uuid || !MR) return;
+      if (window.MPV2.toast) window.MPV2.toast('Opening manga\u2026');
+      MR.chapterFeed(uuid, 'en').then(function (chs) {
+        var first = (chs || []).filter(function (c) { return c && c.id; })
+          .sort(function (x, y) { return parseFloat(x.ch) - parseFloat(y.ch); })[0];
+        if (!first) throw new Error('no chapters');
+        return MR.chapterPages(first.id).then(function (pages) {
+          MR.openReader({ uuid: uuid, ctx: {},
+            chapter: { id: first.id, ch: first.ch, title: first.title, pages: pages } });
+        });
+      }).catch(function () { if (window.MPV2.toast) window.MPV2.toast('Could not open this manga.'); });
+    } else if (kind === 'hindi') {
+      // No meta ID for Hindi-only titles: title-match straight into the
+      // existing provider dialog (same as the movie Play button flow).
+      var title = card.getAttribute('data-god-title');
+      if (title && window.MPV2.Stream) window.MPV2.Stream.playEpisode({ title: title }, 1);
+    } else if (kind === 'reanime') {
+      var aid = card.getAttribute('data-god-anilist');
+      var API = window.MPV2.AnimeAPI;
+      if (aid && API) {
+        location.hash = '#/animation/online/' + API.getProvider() + '/' + aid;
+      } else {
+        var t2 = card.getAttribute('data-god-title');
+        if (t2 && window.MPV2.Stream) window.MPV2.Stream.playEpisode({ title: t2 }, 1);
+      }
+    }
+  }
+
+  window.MPV2.getGodMode = getGodMode;
+  window.MPV2.setGodMode = setGodMode;
+  window.MPV2.godToggleHtml = godToggleHtml;
+  window.MPV2.godResultsHtml = godResultsHtml;
+  window.MPV2.openGodCard = openGodCard;
   window.MPV2.onlineSkeletons = skeletonCards;
   window.MPV2.onlineErrorHtml = errorHtml;
 

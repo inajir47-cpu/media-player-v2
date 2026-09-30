@@ -1023,6 +1023,89 @@
   var GENRES = ['Action', 'Adventure', 'Comedy', 'Drama', 'Fantasy', 'Horror',
                 'Isekai', 'Mystery', 'Romance', 'Sci-Fi', 'Slice of Life'];
 
+  /* ==================== God Mode: direct provider search ==================== */
+  // Bypasses the meta-APIs (AniList/Jikan/Kitsu) and queries the underlying
+  // provider servers directly, in parallel. Each hit is normalized to:
+  // {title, image, type:'movie'|'series'|'manga', server, langs[], audio[], ref}.
+  // MangaDex is restricted to safe/suggestive content (its native filter);
+  // Hindi/Reanime catalogs are mainstream dub/sub libraries.
+  function godTimeout(p, ms) {
+    return Promise.race([p, new Promise(function (_, rej) {
+      setTimeout(function () { rej(new Error('god-timeout')); }, ms || 12000);
+    })]);
+  }
+  function godSettled(p) {
+    return p.then(function (v) { return v || []; }, function () { return []; });
+  }
+  function godGlobalSearch(fnName, q) {
+    return new Promise(function (res) {
+      try {
+        var fn = window[fnName];
+        if (typeof fn === 'function') fn(q).then(res, function () { res([]); });
+        else res([]);
+      } catch (e) { res([]); }
+    });
+  }
+  function normHindi(r, server) {
+    if (!r || !r.title) return null;
+    return {
+      title: r.title, image: r.image || '',
+      type: r.hindiType === 'movie' ? 'movie' : 'series',
+      server: server, langs: ['Hindi'], audio: ['Dub'],
+      ref: { kind: 'hindi', slug: r.hindiSlug, type: r.hindiType }
+    };
+  }
+  function mdGodSearch(query) {
+    return mdGet('/manga?title=' + encodeURIComponent(query) + '&limit=10' +
+      '&contentRating%5B%5D=safe&contentRating%5B%5D=suggestive' +
+      '&includes%5B%5D=cover_art&order%5Brelevance%5D=desc').then(function (j) {
+      return (j.data || []).map(function (m) {
+        var a = m.attributes || {}, t = a.title || {};
+        var title = t.en || Object.keys(t).map(function (k) { return t[k]; })[0] || 'Untitled';
+        var cover = '';
+        (m.relationships || []).forEach(function (rel) {
+          if (rel.type === 'cover_art' && rel.attributes && rel.attributes.fileName && !cover)
+            cover = 'https://uploads.mangadex.org/covers/' + m.id + '/' + rel.attributes.fileName;
+        });
+        var langs = (a.availableTranslatedLanguages || []).map(function (l) {
+          return String(l).toUpperCase();
+        }).filter(function (l, i, arr) { return arr.indexOf(l) === i; }).slice(0, 3);
+        return {
+          title: title, image: cover, type: 'manga', server: 'MangaDex',
+          langs: langs.length ? langs : ['EN'], audio: [],
+          ref: { kind: 'mangadex', uuid: m.id }
+        };
+      });
+    });
+  }
+  function godSearch(q) {
+    var query = String(q || '').trim();
+    if (!query) return Promise.resolve([]);
+    var jobs = [
+      godSettled(godTimeout(godGlobalSearch('hiSearch', query)).then(function (rs) {
+        return rs.map(function (r) { return normHindi(r, 'Hindi-1'); }).filter(Boolean);
+      })),
+      godSettled(godTimeout(godGlobalSearch('cdSearch', query)).then(function (rs) {
+        return rs.map(function (r) { return normHindi(r, 'Hindi-2'); }).filter(Boolean);
+      })),
+      godSettled(godTimeout(new Promise(function (res) {
+        try {
+          var S = window.MPV2 && window.MPV2.Stream;
+          if (S && typeof S.searchReanime === 'function') S.searchReanime(query).then(res, function () { res([]); });
+          else res([]);
+        } catch (e) { res([]); }
+      }))),
+      godSettled(godTimeout(mdGodSearch(query)))
+    ];
+    return Promise.all(jobs).then(function (lists) {
+      var out = [];
+      lists.forEach(function (l) {
+        (l || []).forEach(function (it) { if (it && it.title) out.push(it); });
+      });
+      return out;
+    });
+  }
+
   var ADAPTERS = {
     anilist: { top: anilistTop, genre: anilistGenre, format: anilistFormat, detail: anilistDetail, character: anilistCharacter, reco: anilistRecommendations, search: anilistSearch },
     jikan:   { top: jikanTop,   genre: jikanGenre,   format: jikanFormat,   detail: jikanDetail,   character: jikanCharacter,   reco: jikanRecommendations,   search: jikanSearch },
@@ -1137,6 +1220,8 @@
       if (!fn) return Promise.reject(new Error('Search is not available for ' + PROVIDERS[p].name + '.'));
       return fn(q);
     },
+    // God Mode: direct provider-server search, bypassing the meta-APIs.
+    godSearch: function (q) { return godSearch(q); },
     episodes: function (provider, id, detail, page) {
       var p = PROVIDERS[provider] ? provider : getProvider();
       page = page || 1;
