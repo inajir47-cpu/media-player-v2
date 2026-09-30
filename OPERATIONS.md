@@ -721,11 +721,11 @@ Obey this on every update. Updated 2026-09-30.
     anime-online.js renders hanime cards (18+ badge) and openGodCard plays
     them after the adult warning; stream.js adds kind 'ha' resolve branch
     and public playHanime(slug,title,poster) (isMovie hides episode nav).
-    Committed locally, NOT pushed, NOT phone-tested.
+    PUSHED 2026-10-01 ~01:33 +04: origin/main 908ef5d -> 952a0b6 (PAT used transiently, then scrubbed). NOT phone-tested.
 43. 2026-10-01 — Hentai genre on homepage now includes hentai videos
     (Imran: "need to show in homepage hentai in genres"). The Hentai genre
     chip (18+ opt-in only) already existed; loadHentaiGenre only pulled
     nhentai + hitomi manga. One-line addition: the genre grid now also
     queries window.haSearch('hentai'), so hanime videos mix into the same
     grid (cards already render/play via the earlier hanime wiring).
-    Committed locally, NOT pushed, NOT phone-tested.
+    PUSHED 2026-10-01 ~01:33 +04: origin/main 908ef5d -> 952a0b6 (PAT used transiently, then scrubbed). NOT phone-tested.
