@@ -42,6 +42,22 @@
   window.MPV2.unlockBodyScroll = unlockBodyScroll;
   // Last loaded title detail (reviews, nextAiring) for the YouTube-style player.
   window.MPV2.getLastDetail = function () { return lastDetail; };
+  // Episode stills currently rendered on the detail page ({ epN: imgUrl }),
+  // for the player sidebar backgrounds. Missing episodes fall back to the
+  // series poster in stream.js.
+  window.MPV2.getEpisodeThumbs = function () {
+    var out = {};
+    try {
+      Array.prototype.forEach.call(
+        document.querySelectorAll('[data-ep-grid] .episode-card[data-ep-n]'),
+        function (card) {
+          var n = parseInt(card.getAttribute('data-ep-n'), 10);
+          var img = card.querySelector('img');
+          if (n > 0 && img && img.src) out[n] = img.src;
+        });
+    } catch (e) {}
+    return out;
+  };
 
   // Generic bottom-sheet modal. Reuses the .st-scrim/.st-dialog dialog chrome
   // from the provider chooser so popups look consistent.

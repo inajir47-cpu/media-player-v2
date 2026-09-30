@@ -563,6 +563,7 @@
   }
 
   var openDlg = null; // { n, avail, refresh } — refreshed when staged availability resolves
+  var lastPlayerProvs = null; // provider list for the in-player server dropdown
   var lastEmptyToast = 0; // throttle for the no-providers toast in openProviderDialog
   function openProviderDialog(ctx, n, avail) {
     closeDialog();
@@ -646,6 +647,7 @@
     startBtn.addEventListener('click', function () {
       if (!selLang) return;
       closeDialog();
+      lastPlayerProvs = providersFor(avail);
       startWatch(ctx, n, selProv, selLang);
     });
     scrim.querySelector('.st-x').addEventListener('click', closeDialog);
@@ -743,6 +745,8 @@
       startWatch(ctx, nn, prov, lang);
     }
     shell._ytGoEp = goEp;
+    shell._ytNav = { ctx: ctx, n: n, prov: prov, lang: lang, provs: lastPlayerProvs || [prov] };
+    buildYtDropdowns(shell);
     var prevBtn = shell.querySelector('.st-p-prev');
     var nextBtn = shell.querySelector('.st-p-next');
     if (prevBtn) {
@@ -950,13 +954,16 @@
     if (!side || !total) { if (side) side.style.display = 'none'; return; }
     var W = window.MPV2.Watch;
     var prog = W ? W.getEpProgress(W.keyFor(ctx)) : {};
+    var thumbs = (window.MPV2 && window.MPV2.getEpisodeThumbs) ? window.MPV2.getEpisodeThumbs() : {};
+    var fallback = ctx.poster || '';
     side.querySelector('.st-yt-epcount').textContent = total + ' eps';
     var html = '';
     for (var n = 1; n <= total; n++) {
       var p = prog[n], pct = 0, done = false;
       if (p && p.d > 0) { pct = Math.min(100, Math.round((p.p / p.d) * 100)); done = !!p.done; }
-      html += '<button type="button" class="st-yt-ep' + (n === curN ? ' cur' : '') +
-        '" data-ep="' + n + '">' +
+      var bg = thumbs[n] || fallback;
+      html += '<button type="button" class="st-yt-ep' + (n === curN ? ' cur' : '') + (bg ? ' has-bg' : '') +
+        '" data-ep="' + n + '"' + (bg ? ' style="--ep-bg:url(\'' + bg.replace(/'/g, '%27') + '\')"' : '') + '>' +
         '<span class="st-yt-ep-n">' + n + '</span>' +
         '<span class="st-yt-ep-tx"><b>Episode ' + n + '</b>' +
         '<span class="st-yt-ep-sub">' + (done ? 'Watched' : pct > 0 ? pct + '% watched' : 'Not started') + '</span></span>' +
@@ -1000,6 +1007,56 @@
     el._ytCdStop = stop;
     el._ytCdT = setInterval(tick, 1000);
     tick();
+  }
+
+  /* ----- YouTube-style: server + audio dropdowns below the player ----- */
+  // Both switch by re-running startWatch — the same code path as the provider
+  // dialog, so error handling and retries behave identically.
+  function buildYtDropdowns(el) {
+    var nav = el._ytNav;
+    if (!nav) return;
+    var wrap = el.querySelector('.st-yt-actions');
+    if (!wrap) return;
+    // Server dropdown (only when there is a real choice)
+    var provs = nav.provs || [];
+    if (provs.length > 1) {
+      var sSel = document.createElement('select');
+      sSel.className = 'st-yt-select';
+      sSel.setAttribute('aria-label', 'Streaming server');
+      provs.forEach(function (p) {
+        var o = document.createElement('option');
+        o.value = p.name; o.textContent = p.name;
+        if (p.name === nav.prov.name) o.selected = true;
+        sSel.appendChild(o);
+      });
+      sSel.addEventListener('change', function () {
+        var np = null;
+        provs.forEach(function (p) { if (p.name === sSel.value) np = p; });
+        if (np && np.name !== nav.prov.name) {
+          var langs = providerLangs(np);
+          var nl = langs.indexOf(nav.lang) >= 0 ? nav.lang : langs[0];
+          startWatch(nav.ctx, nav.n, np, nl);
+        }
+      });
+      wrap.appendChild(sSel);
+    }
+    // Audio / voice dropdown (languages for the current provider)
+    var langs = providerLangs(nav.prov);
+    if (langs.length > 1) {
+      var lSel = document.createElement('select');
+      lSel.className = 'st-yt-select';
+      lSel.setAttribute('aria-label', 'Audio language');
+      langs.forEach(function (l) {
+        var o = document.createElement('option');
+        o.value = l; o.textContent = l;
+        if (l === nav.lang) o.selected = true;
+        lSel.appendChild(o);
+      });
+      lSel.addEventListener('change', function () {
+        if (lSel.value !== nav.lang) startWatch(nav.ctx, nav.n, nav.prov, lSel.value);
+      });
+      wrap.appendChild(lSel);
+    }
   }
 
   function playerFail(shell, msg) {

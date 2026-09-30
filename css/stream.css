@@ -238,3 +238,26 @@
   }
   .st-yt-eplist { max-height: 420px; overflow-y: auto; overscroll-behavior: contain; }
 }
+
+/* episode cards with thumbnail backgrounds (dark gradient for legibility) */
+.st-yt-ep.has-bg {
+  background-image: linear-gradient(90deg, rgba(0,0,0,.88) 0%, rgba(0,0,0,.55) 60%, rgba(0,0,0,.35) 100%),
+    var(--ep-bg);
+  background-size: cover, cover;
+  background-position: center, center;
+  border: 1px solid rgba(255,255,255,.08);
+}
+.st-yt-ep.has-bg:hover { background-image: linear-gradient(90deg, rgba(0,0,0,.82) 0%, rgba(0,0,0,.48) 60%, rgba(0,0,0,.28) 100%),
+    var(--ep-bg); }
+/* server / audio dropdowns below the player */
+.st-yt-select {
+  border-radius: 999px; padding: 9px 34px 9px 16px;
+  background-color: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.12);
+  color: #fff; font-size: 13px; font-weight: 600; cursor: pointer;
+  appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23fff' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 13px center;
+  max-width: 180px; text-overflow: ellipsis;
+}
+.st-yt-select option { background: #1a1a1e; color: #fff; }
