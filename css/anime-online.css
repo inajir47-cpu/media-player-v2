@@ -606,6 +606,7 @@ button.trailer-btn { cursor: pointer; font-family: inherit; }
   position: relative; overflow: hidden; border-radius: 22px;
   height: 470px; margin-bottom: 26px; background: #0b0b10;
   border: 1px solid rgba(255,255,255,.07);
+  touch-action: pan-y;
 }
 .hero-track { position: absolute; inset: 0; }
 .hero-loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
@@ -688,15 +689,19 @@ button.trailer-btn { cursor: pointer; font-family: inherit; }
   position: relative; overflow: hidden; padding: 0;
 }
 .hero-dots button::after {
-  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 0%;
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 100%;
   background: #fff; border-radius: 3px;
+  transform: scaleX(0); transform-origin: left center;
 }
 .hero-carousel.hero-auto .hero-dots button.active::after {
   animation: hero-dot-fill 15s linear forwards;
 }
+.hero-carousel.hero-paused .hero-dots button.active::after {
+  animation-play-state: paused;
+}
 @keyframes hero-dot-fill {
-  from { width: 0%; }
-  to { width: 100%; }
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
 }
 @media (max-width: 640px) {
   .hero-carousel { height: 380px; border-radius: 16px; }

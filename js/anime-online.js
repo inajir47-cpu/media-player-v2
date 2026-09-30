@@ -482,18 +482,37 @@
       void d.offsetWidth;
       d.classList.add('active');
     }
+    var CYCLE = 15000;
+    var timer = null, cycleStart = 0, remaining = CYCLE;
+    function autoLive() { return n > 1 && detailVideoAllowed(); }
+    function onCycleEnd() { activate(cur + 1); play(); }
+    // Fresh 15s cycle: initial, auto-advance, manual nav (arrows/dots/swipe).
     function play() {
-      stop();
-      wrap.classList.remove('hero-auto');
-      if (n > 1 && detailVideoAllowed()) {
-        timer = setInterval(function () { activate(cur + 1); }, 15000);
+      clearTimeout(timer); timer = null;
+      wrap.classList.remove('hero-paused');
+      if (autoLive()) {
+        remaining = CYCLE; cycleStart = Date.now();
+        timer = setTimeout(onCycleEnd, CYCLE);
         wrap.classList.add('hero-auto');
+      } else {
+        wrap.classList.remove('hero-auto');
       }
       restartDotFill();
     }
-    function stop() {
-      if (timer) { clearInterval(timer); timer = null; }
-      wrap.classList.remove('hero-auto');
+    // Freeze timer + fill mid-cycle: mouse hover, press-hold, hidden tab.
+    function pauseCycle() {
+      if (timer) {
+        clearTimeout(timer); timer = null;
+        remaining = Math.max(0, CYCLE - (Date.now() - cycleStart));
+      }
+      wrap.classList.add('hero-paused');
+    }
+    // Continue from the frozen point — no abrupt restart.
+    function resumeCycle() {
+      wrap.classList.remove('hero-paused');
+      if (timer || !autoLive()) return;
+      cycleStart = Date.now() - (CYCLE - remaining);
+      timer = setTimeout(onCycleEnd, remaining);
     }
     wrap.addEventListener('click', function (e) {
       var nav = e.target.closest('[data-hero-nav]');
@@ -524,24 +543,27 @@
       }
     }
     wrap.addEventListener('touchend', endTouchSwipe, { passive: true });
-    wrap.addEventListener('touchcancel', function () { tActive = false; }, { passive: true });
+    // If the browser hijacks the gesture mid-swipe, touchcancel fires instead
+    // of touchend — still honor a qualifying horizontal swipe.
+    wrap.addEventListener('touchcancel', endTouchSwipe, { passive: true });
     // Hold-to-pause (touch/mouse press) and hover-to-pause (real mouse only):
-    // the carousel never auto-advances while the user is interacting with it.
+    // the carousel freezes mid-cycle while the user is interacting with it,
+    // then resumes from the frozen point — never an abrupt restart.
     var held = false, hovering = false;
-    function maybeResume() { if (!held && !hovering && wrap.isConnected) play(); }
-    wrap.addEventListener('pointerdown', function () { held = true; stop(); }, { passive: true });
+    function maybeResume() { if (!held && !hovering && wrap.isConnected) resumeCycle(); }
+    wrap.addEventListener('pointerdown', function () { held = true; pauseCycle(); }, { passive: true });
     function releaseHold() { if (!held) return; held = false; maybeResume(); }
     window.addEventListener('pointerup', releaseHold, { passive: true });
     window.addEventListener('pointercancel', releaseHold, { passive: true });
     wrap.addEventListener('pointerenter', function (e) {
-      if (e.pointerType === 'mouse') { hovering = true; stop(); }
+      if (e.pointerType === 'mouse') { hovering = true; pauseCycle(); }
     });
     wrap.addEventListener('pointerleave', function (e) {
       if (e.pointerType === 'mouse') { hovering = false; maybeResume(); }
     });
     document.addEventListener('visibilitychange', function () {
       if (!wrap.isConnected) return;
-      if (document.hidden) stop(); else play();
+      if (document.hidden) pauseCycle(); else play();
     });
     activate(0); play();
   }
