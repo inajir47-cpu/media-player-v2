@@ -483,6 +483,30 @@
       var dot = e.target.closest('[data-hero-dot]');
       if (dot) { activate(parseInt(dot.getAttribute('data-hero-dot'), 10)); play(); }
     });
+    // Touch swipe: left → next slide, right → previous slide. Only
+    // predominantly horizontal swipes past 50px count, so vertical page
+    // scrolling and taps (e.g. "View details") are unaffected. Never calls
+    // preventDefault, so native scrolling is never blocked.
+    var tSX = 0, tSY = 0, tDX = 0, tDY = 0, tActive = false;
+    wrap.addEventListener('touchstart', function (e) {
+      var t = e.changedTouches[0];
+      tSX = t.clientX; tSY = t.clientY; tDX = 0; tDY = 0; tActive = true;
+    }, { passive: true });
+    wrap.addEventListener('touchmove', function (e) {
+      if (!tActive) return;
+      var t = e.changedTouches[0];
+      tDX = t.clientX - tSX; tDY = t.clientY - tSY;
+    }, { passive: true });
+    function endTouchSwipe() {
+      if (!tActive) return;
+      tActive = false;
+      if (Math.abs(tDX) > 50 && Math.abs(tDX) > Math.abs(tDY)) {
+        activate(cur + (tDX < 0 ? 1 : -1));
+        play();
+      }
+    }
+    wrap.addEventListener('touchend', endTouchSwipe, { passive: true });
+    wrap.addEventListener('touchcancel', function () { tActive = false; }, { passive: true });
     // Hold-to-pause (touch/mouse press) and hover-to-pause (real mouse only):
     // the carousel never auto-advances while the user is interacting with it.
     var held = false, hovering = false;
