@@ -14,7 +14,7 @@
 .st-scrim{position:fixed; inset:0; z-index:900; display:flex; align-items:flex-end; justify-content:center;
   background:rgba(0,0,0,.62); -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px); padding:18px}
 .st-dialog{position:relative; width:min(480px,100%); max-height:82vh; overflow:auto;
-  background:rgba(14,14,20,.96); border:1px solid rgba(255,255,255,.12); border-radius:20px;
+  background:#0a0a0c; border:1px solid #232326; border-radius:20px;
   padding:22px 18px 18px; box-shadow:0 24px 60px rgba(0,0,0,.6)}
 .st-dialog h3{margin:0 0 4px; font-size:19px; font-weight:800; color:#fff}
 .st-dialog .st-sub{margin:0 0 16px; font-size:13px; color:rgba(255,255,255,.55)}
@@ -27,7 +27,7 @@
 .st-head{position:sticky; top:-22px; z-index:10; display:flex;
   align-items:flex-start; justify-content:space-between; gap:12px;
   margin:-22px -18px 14px; padding:16px 18px 12px;
-  background:rgb(14,14,20); border-radius:20px 20px 0 0;
+  background:#0a0a0c; border-radius:20px 20px 0 0;
   border-bottom:1px solid rgba(255,255,255,.08);
   box-shadow:0 8px 24px rgba(0,0,0,.35)}
 .st-head-tx{min-width:0; flex:1}

@@ -3,6 +3,13 @@
  * Pitch-black OLED base, liquid-glass surfaces, chameleon --tone accents.
  * ========================================================================== */
 
+/* Register --tone as an animatable color so poster tinting cross-fades smoothly. */
+@property --tone {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #b54aea;
+}
+
 .online-wrap { display: flex; flex-direction: column; gap: 26px; padding: 4px 0 32px; }
 .online-block h2 { font-size: 19px; letter-spacing: .04em; margin: 0 0 2px; }
 .online-sub { margin: 0; font-size: 12.5px; color: var(--muted, #8e8e93); }
@@ -150,7 +157,7 @@
 .sk-card .poster-img { aspect-ratio: 2/3; border-radius: 14px; }
 
 /* ------------------------- online detail page -------------------------- */
-.online-detail { --tone: var(--tone); }
+.online-detail { --tone: var(--tone); transition: --tone .6s ease; }
 .detail-banner { margin: -8px -16px 0; height: 190px; overflow: hidden; position: relative;
   -webkit-mask-image: linear-gradient(#000 55%, transparent); mask-image: linear-gradient(#000 55%, transparent); }
 .detail-banner img { width: 100%; height: 100%; object-fit: cover; }

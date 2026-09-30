@@ -179,7 +179,25 @@ Obey this on every update. Updated 2026-09-30.
     pushed 2026-09-30 (Render redeploying). Lesson: sandbox browsers fail CORS to inst.psec.dev AND
     block all external egress (even the worker), so the browser-side test
     used canned API responses; direct + worker paths were proven separately
-    via curl. Phone test still pending — only Imran's device counts.
+    via curl. PHONE-TESTED 2026-09-30: Imran confirmed the live site works
+    (God Mode + both adult providers).
+
+15. **2026-09-30 — Popup OLED theme match + smooth poster tint.** Strict
+    color-only pass, zero logic changes: the Server/Provider Selection popup
+    (`.st-dialog` + its sticky `.st-head` in `css/stream.css`) was still on the
+    old blue-tinted `rgba(14,14,20,.96)` / `rgb(14,14,20)` — now
+    `background:#0a0a0c; border:1px solid #232326`, exactly matching the
+    Trailer/External-Link warning popup (`.ext-confirm`), which was already
+    OLED-compliant and untouched. Badges, rating colors, selection glow,
+    buttons, and all popup logic unchanged. Poster tinting: `tintFromPoster`
+    (`js/anime-online.js`) was already firing on anime/series/manga detail +
+    character pages, but the tint snapped instantly; registered
+    `@property --tone` (`syntax:'<color>'`, inherits, initial `#b54aea`) and
+    added `transition: --tone .6s ease` on `.online-detail` so the chameleon
+    accent cross-fades smoothly. Verified: real Chromium 8/8 (computed
+    colors, transition presence, glow/button regression checks; screenshot
+    `v2-provider-dialog.png`). Local commit, NOT pushed (needs fresh PAT).
+    Phone test pending — only Imran's device counts.
 
 ## Standing rules — obey on every update
 
