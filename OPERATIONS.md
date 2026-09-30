@@ -609,3 +609,25 @@ Obey this on every update. Updated 2026-09-30.
     own /mappings, so Kitsu-id deep links still retry — lists/search fall back
     and fallback cards carry provider 'anilist', so normal navigation works.
     NOT phone-tested — only Imran's device counts.
+35. 2026-09-30 — Instant episode loading + red globe for dead episodes.
+    `js/stream.js`: removed the dead `hindiWithRetry()` (9s sleeps x2 per
+    episode — retries could never succeed because hindiMatch/hindiDetail
+    already cache failures as null, so it only burned ~18s per episode while
+    holding a queue slot). `checkEpisodeStaged()` now runs a fast lane
+    (EN/zanime/Hindi-2, holds the queue slot) and a detached Hindi slow lane
+    that repaints on completion but never blocks other cards; slot releases
+    when the fast lane settles. `wGetJSON()` (Cloudflare worker) capped at
+    12s so a hung worker can't wedge the queue. New `done` callback fires
+    when every lane settles: `paintCard(..., final)` paints nothing while
+    checks are in flight, but on a final zero-source verdict renders a
+    non-interactive red globe (`span.episode-action.st-globe.unavailable`,
+    title/aria "No streams available") instead of no globe. `css/stream.css`:
+    `.st-globe.unavailable` red tint (#f87171, SVG uses currentColor).
+    Verified in real Chromium with stubbed providers (6/6): slow 3s Hindi
+    scraper did not delay the EN SUB badge + blue globe (painted at 836ms);
+    no globe painted while checks in flight; zero-source episode got the red
+    span (computed rgb(248,113,113)); episode with sources kept its blue
+    button globe; hung worker released at 12.1s with the queue unblocked.
+    Preserved: staged badge painting, dialog refresh, queue dedupe,
+    MutationObserver for late cards, manga chapter globes (untouched).
+    NOT phone-tested — only Imran's device counts.

@@ -9,6 +9,8 @@
 .st-b.st-hi{border-color:rgba(251,191,36,.7)}
 .episode-action.st-globe{background:rgba(20,60,120,.72); border-color:rgba(96,165,250,.65);
   box-shadow:0 0 10px rgba(96,165,250,.35)}
+.episode-action.st-globe.unavailable{background:rgba(120,20,20,.72); border-color:rgba(248,113,113,.65);
+  box-shadow:0 0 10px rgba(248,113,113,.35); color:#f87171; cursor:default}
 
 /* Choose Provider dialog */
 .st-scrim{position:fixed; inset:0; z-index:900; display:flex; align-items:flex-end; justify-content:center;

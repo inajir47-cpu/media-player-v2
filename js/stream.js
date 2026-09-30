@@ -99,9 +99,14 @@
     return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
   function wGetJSON(url) {
-    return fetch(wproxy(url)).then(function (r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
+    // 12s cap: a hung worker must never hold a queue slot forever.
+    return new Promise(function (res, rej) {
+      var to = setTimeout(function () { rej(new Error('Worker request timed out')); }, 12000);
+      fetch(wproxy(url)).then(function (r) {
+        clearTimeout(to);
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      }).then(res, function (e) { clearTimeout(to); rej(e); });
     });
   }
   var serversCache = {};
@@ -247,22 +252,20 @@
 
   /* ---------- per-episode availability ---------- */
   var pending = [], running = 0, MAXC = 4;
-  function stSleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
-  function hindiWithRetry(title, n, attempt) {
-    return hindiHasEpisode(title, n).then(function (h) {
-      if (h || attempt >= 2) return h;
-      return stSleep(9000).then(function () { return hindiWithRetry(title, n, attempt + 1); });
-    }, function () {
-      if (attempt >= 2) return null;
-      return stSleep(9000).then(function () { return hindiWithRetry(title, n, attempt + 1); });
-    });
-  }
+  // NOTE: the old hindiWithRetry() (9s sleeps x2 per episode) is gone.
+  // hindiMatch/hindiDetail already swallow transient failures into a cached
+  // null (evicted after 30s), so a falsy result is definitive for this pass —
+  // the retries could never succeed and only burned ~18s per episode while
+  // holding a queue slot.
   // Staged: paints EN badges as soon as ready, re-paints when Hindi resolves.
-  function checkEpisodeStaged(ctx, n, cb) {
+  // Fast lane (EN/zanime/Hindi-2) holds the queue slot; the Hindi scraper
+  // runs in a detached slow lane that repaints on completion but never
+  // blocks other cards. `done` fires once every lane has settled.
+  function checkEpisodeStaged(ctx, n, cb, done) {
     var avail = { sub: false, dub: false, hindi: false, hindi2: false, zanime: false, servers: [] };
-    var jobs = [];
+    var fast = [];
     if (ctx.anilistId) {
-      jobs.push(enServers(ctx.anilistId, n).then(function (ss) {
+      fast.push(enServers(ctx.anilistId, n).then(function (ss) {
         avail.servers = ss;
         avail.sub = ss.some(function (s) { return s.dataType === 'sub'; });
         avail.dub = ss.some(function (s) { return s.dataType === 'dub'; });
@@ -270,24 +273,27 @@
       }));
     }
     if (ctx.anilistId && typeof window.zaHasEpisode === 'function') {
-      jobs.push(window.zaHasEpisode(ctx.anilistId, n).then(function (z) {
+      fast.push(window.zaHasEpisode(ctx.anilistId, n).then(function (z) {
         avail.zanime = !!z;
         cb(avail);
       }, function () { cb(avail); }));
     }
-    if (ctx.title && typeof window.hiSearch === 'function') {
-      jobs.push(hindiWithRetry(ctx.title, n, 0).then(function (h) {
-        avail.hindi = !!h;
-        cb(avail);
-      }));
-    }
     if (ctx.title && typeof window.cdHasEpisode === 'function') {
-      jobs.push(window.cdHasEpisode(ctx.title, n).then(function (h) {
+      fast.push(window.cdHasEpisode(ctx.title, n).then(function (h) {
         avail.hindi2 = !!h;
         cb(avail);
       }, function () { cb(avail); }));
     }
-    return Promise.all(jobs).then(function () { return avail; });
+    var slow = Promise.resolve();
+    if (ctx.title && typeof window.hiSearch === 'function') {
+      slow = hindiHasEpisode(ctx.title, n).then(function (h) {
+        avail.hindi = !!h;
+        cb(avail);
+      }, function () {});
+    }
+    var fastSettled = Promise.all(fast).then(function () {}, function () {});
+    Promise.all([fastSettled, slow]).then(function () { done(avail); });
+    return fastSettled; // queue slot releases when the fast lane settles
   }
   function queueCard(card, ctx) {
     var n = parseInt(card.getAttribute('data-ep-n'), 10);
@@ -301,16 +307,31 @@
       (function (job) {
         running++;
         checkEpisodeStaged(job.ctx, job.n, function (avail) {
-          paintCard(job.card, job.ctx, job.n, avail);
+          paintCard(job.card, job.ctx, job.n, avail, false);
+        }, function (avail) {
+          paintCard(job.card, job.ctx, job.n, avail, true);
         }).catch(function () {}).then(function () { running--; pump(); });
       })(pending.shift());
     }
   }
-  function paintCard(card, ctx, n, avail) {
+  function paintCard(card, ctx, n, avail, final) {
     if (openDlg && openDlg.n === n) { try { openDlg.refresh(); } catch (e) {} }
     var old = card.querySelector('.st-badges'); if (old) old.remove();
     var oldG = card.querySelector('.st-globe'); if (oldG) oldG.remove();
-    if (!avail.sub && !avail.dub && !avail.hindi && !avail.hindi2 && !avail.zanime) return;
+    var hasAny = avail.sub || avail.dub || avail.hindi || avail.hindi2 || avail.zanime;
+    // Checks still in flight: paint nothing yet. Final verdict with zero
+    // sources: red globe so the dead episode is visible at a glance.
+    if (!hasAny && !final) return;
+    var actions = card.querySelector('.episode-actions');
+    if (!hasAny) {
+      var none = document.createElement('span');
+      none.className = 'episode-action st-globe unavailable';
+      none.title = 'No streams available';
+      none.setAttribute('aria-label', 'No streams available for episode ' + n);
+      none.innerHTML = icon('globe');
+      if (actions) actions.appendChild(none); else card.appendChild(none);
+      return;
+    }
     var tags = '';
     if (avail.sub) tags += '<i class="st-b st-sub">SUB</i>';
     if (avail.dub) tags += '<i class="st-b st-dub">DUB</i>';
@@ -330,7 +351,6 @@
       ev.preventDefault(); ev.stopPropagation();
       openProviderDialog(ctx, n, avail);
     });
-    var actions = card.querySelector('.episode-actions');
     if (actions) actions.appendChild(btn); else card.appendChild(btn);
   }
 
