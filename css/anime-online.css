@@ -201,7 +201,7 @@
   background: color-mix(in srgb, var(--tone) 16%, transparent);
   border: 1px solid color-mix(in srgb, var(--tone) 40%, transparent); }
 .trailer-btn { display: inline-flex; align-items: center; gap: 10px;
-  background: transparent; color: var(--ink, #fff); text-decoration: none;
+  background: transparent; color: var(--text); text-decoration: none;
   font-weight: 600; font-size: 15px; padding: 10px 4px; border: 0; }
 .trailer-btn .icon { width: 20px; height: 20px; }
 .trailer-btn:active { opacity: .7; }
@@ -219,7 +219,7 @@ button.trailer-btn { cursor: pointer; font-family: inherit; }
 .wh-play .icon { width: 18px; height: 18px; }
 .wh-play:active { transform: scale(.97); }
 .wh-save { display: inline-flex; align-items: center; gap: 10px; cursor: pointer;
-  font-family: inherit; font-weight: 600; font-size: 15px; color: var(--ink, #fff);
+  font-family: inherit; font-weight: 600; font-size: 15px; color: var(--text);
   background: transparent; border: 0; padding: 10px 4px; }
 .wh-save .icon { width: 20px; height: 20px; }
 .wh-save:active { opacity: .7; }
@@ -318,6 +318,10 @@ button.trailer-btn { cursor: pointer; font-family: inherit; }
     align-items: start;
   }
   .detail-copy { display: contents; }
+  /* Restore text/buttons above the background video layer.
+     (display:contents broke the desktop z-index rule which only
+     targets direct children of .detail-hero.) */
+  .detail-copy > * { position: relative; z-index: 1; }
 
   .detail-hero > .poster-img.big {
     grid-column: 1;
