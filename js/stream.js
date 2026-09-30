@@ -436,6 +436,7 @@
       saveBtn.innerHTML = icon('bookmark') +
         '<span>' + (saved ? 'Saved' : 'Watchlist') + '</span>';
       saveBtn.setAttribute('aria-pressed', String(saved));
+      saveBtn.setAttribute('aria-label', saved ? 'Remove from watchlist' : 'Add to watchlist');
     }
     playBtn.addEventListener('click', function () {
       var entry = W.getEntry(key);

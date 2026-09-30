@@ -381,8 +381,9 @@ button.trailer-btn { cursor: pointer; font-family: inherit; }
   .detail-copy > .detail-actions {
     grid-column: 1 / -1; grid-row: 6;
     margin: 14px 0 0;
-    display: flex; flex-wrap: wrap; gap: 8px 14px;
+    display: flex; flex-wrap: nowrap; gap: 6px 12px;
     min-width: 0; max-width: 100%;
+    align-items: center;
   }
   .detail-copy > .detail-actions .trailer-btn,
   .detail-copy > .detail-actions .wh-save {
@@ -394,6 +395,19 @@ button.trailer-btn { cursor: pointer; font-family: inherit; }
   }
   .detail-copy > .wh-row .wh-play {
     flex: 1; justify-content: center;
+  }
+}
+
+/* Very narrow phones: action bar stays one compact row, buttons drop
+   their text labels and show icons only. */
+@media (max-width: 350px) {
+  .detail-copy > .detail-actions .trailer-btn span,
+  .detail-copy > .detail-actions .wh-save span {
+    display: none;
+  }
+  .detail-copy > .detail-actions .trailer-btn,
+  .detail-copy > .detail-actions .wh-save {
+    padding: 10px 10px;
   }
 }
 

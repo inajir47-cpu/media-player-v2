@@ -1147,10 +1147,10 @@
         '</span></div>';
     }
     var trailer = d.trailerYoutube
-      ? '<a class="trailer-btn" href="https://www.youtube.com/watch?v=' + esc(d.trailerYoutube) +
+      ? '<a class="trailer-btn" aria-label="Trailer" href="https://www.youtube.com/watch?v=' + esc(d.trailerYoutube) +
         '" target="_blank" rel="noopener">' + icon('film') + '<span>Trailer</span></a>' : '';
     var watchOrder = (!isManga && ((d.relations && d.relations.length) || d.nextAiring))
-      ? '<button class="trailer-btn wo-btn" data-watch-order>' + icon('list') +
+      ? '<button class="trailer-btn wo-btn" data-watch-order aria-label="Watch Order">' + icon('list') +
         '<span>Watch Order</span></button>' : '';
     var coming = d.startTs && d.startTs > Date.now()
       ? '<div class="detail-coming"><span class="coming-label">COMING SOON</span>' +
