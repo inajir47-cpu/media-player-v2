@@ -1,0 +1,75 @@
+name: Build Media Player V2 APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Prepare web assets
+        run: |
+          mkdir -p www assets
+          cp index.html www/
+          cp -r css js img media www/
+          # Service worker would pin stale builds inside the WebView; the app
+          # tolerates a failed registration (app.js catches it).
+          rm -f www/sw.js
+          # The app calls its Render backend with same-origin /api/* paths.
+          # Inside the APK the origin is https://localhost, so point those
+          # calls at the live backend instead.
+          grep -rlE "['\"\`]/api/" www/js | \
+            xargs sed -i -E "s#(['\"\`])/api/#\1https://media-player-v2.onrender.com/api/#g"
+          echo "Rewritten backend calls:"
+          grep -rhoE "https://media-player-v2.onrender.com/api/[A-Za-z0-9/_?=-]+" www/js | sort -u
+          # App icon + splash source
+          cp img/movies.png assets/icon.png
+          cp img/movies.png assets/splash.png
+
+      - name: Build APK with Capacitor
+        run: |
+          npm init -y
+          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
+          npx cap init "Media Player V2" "app.mediaplayerv2" --web-dir www
+          rm -f capacitor.config.ts
+          npx cap add android
+          npx cap sync android
+          sed -i 's/versionName "1.0"/versionName "2.0.0"/' android/app/build.gradle
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Generate app icon and splash, rebuild
+        continue-on-error: true
+        run: |
+          npm install @capacitor/assets@3
+          npx capacitor-assets generate \
+            --iconBackgroundColor '#0a0a0c' \
+            --splashBackgroundColor '#0a0a0c' \
+            --android
+          cd android
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Media-Player-V2-APK
+          path: "android/app/build/outputs/apk/debug/*.apk"

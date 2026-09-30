@@ -352,9 +352,25 @@ Obey this on every update. Updated 2026-09-30.
     href points at themoviedb.org, tap opens the external-confirm modal
     without leaving the app, detail page shows "More Like This" with the
     canned recommendation (search + recommendations endpoints called),
-    and the key string never appears in page HTML. Local commit, NOT
-    pushed (needs fresh PAT). Phone test pending — only Imran's device
+    and the key string never appears in page HTML. Local commit
+    `4e7dc17`, PUSHED 2026-09-30 (Imran pasted a fresh PAT in chat, used
+    transiently and scrubbed from the remote URL; `b037d75..4e7dc17` on
+    main, Render auto-deploys). Phone test pending — only Imran's device
     counts.
+21. 2026-09-30 — APK build pipeline (Imran explicitly asked for the APK
+    file). New `.github/workflows/build-apk.yml` (manual
+    `workflow_dispatch` trigger; same Capacitor 6 + Gradle debug-APK
+    route as the proven konosuba builder): bundles `index.html` +
+    `css/` + `js/` + `img/` + `media/` into `www/` (backend/, worker/,
+    docs, Dockerfile excluded), drops `sw.js` (a service worker would pin
+    stale builds inside the WebView; `app.js` already tolerates a failed
+    registration), rewrites same-origin `/api/*` calls to
+    `https://media-player-v2.onrender.com/api/*` at build time (inside the
+    APK the origin is `https://localhost`, so the live Render backend
+    serves streaming/search), app id `app.mediaplayerv2`, version 2.0.0,
+    icon/splash generated from `img/movies.png` (best-effort step; the APK
+    builds even if icon generation fails). Third-party APIs (TMDB,
+    AniList, Jikan, MangaDex) are absolute https URLs — untouched.
 
 ## Standing rules — obey on every update
 
