@@ -1148,7 +1148,8 @@
   // tag plus language/audio pills reusing the .st-b badge system.
   var GOD_SERVER_CLASS = {
     'Hindi-1': 'sv-hindi1', 'Hindi-2': 'sv-hindi2',
-    'Reanime': 'sv-reanime', 'MangaDex': 'sv-mangadex', 'nhentai': 'sv-nhentai'
+    'Reanime': 'sv-reanime', 'MangaDex': 'sv-mangadex', 'nhentai': 'sv-nhentai',
+    'hitomi': 'sv-hitomi'
   };
   function langBadgeCls(b) {
     if (/hindi/i.test(b)) return 'st-hi';
@@ -1164,6 +1165,8 @@
     else if (ref.kind === 'mangadex') attrs += ' data-god-uuid="' + esc(ref.uuid || '') + '"';
     else if (ref.kind === 'nhentai')
       attrs += ' data-god-nhid="' + esc(String(ref.id || '')) + '" data-god-title="' + esc(item.title) + '"';
+    else if (ref.kind === 'hitomi')
+      attrs += ' data-god-hitomi="' + esc(String(ref.id || '')) + '" data-god-title="' + esc(item.title) + '"';
     var badges = (item.langs || []).concat(item.audio || []).map(function (b) {
       return '<i class="st-b ' + langBadgeCls(b) + '">' + esc(String(b).toUpperCase()) + '</i>';
     }).join('');
@@ -1173,7 +1176,7 @@
       ' poster" loading="lazy">' +
       '<span class="server-tag ' + (GOD_SERVER_CLASS[item.server] || '') + '">' +
       esc(item.server) + '</span>' +
-      (ref.kind === 'nhentai' ? '<span class="adult18 god-adult">18+</span>' : '') +
+      (ref.kind === 'nhentai' || ref.kind === 'hitomi' ? '<span class="adult18 god-adult">18+</span>' : '') +
       (badges ? '<span class="god-langbadges">' + badges + '</span>' : '') + '</span>' +
       '<span class="poster-title">' + esc(item.title) + '</span>' +
       '<span class="poster-meta">' + esc(meta) + '</span></button>';
@@ -1234,6 +1237,22 @@
           if (!p || !p.pages || !p.pages.length) throw new Error('no pages');
           MR2.openReader({ uuid: 'nhentai:' + nhid, ctx: {},
             chapter: { id: 'nh-' + nhid, ch: '1', title: p.title, pages: p.pages } });
+        }).catch(function () { if (window.MPV2.toast) window.MPV2.toast('Could not open this gallery.'); });
+      });
+    } else if (kind === 'hitomi') {
+      // Hitomi.la mirror (backup): same 18+ warning, pages come pre-proxied
+      // through Heliotrope so the reader never hits hotlink walls.
+      var htid = card.getAttribute('data-god-hitomi');
+      var htt = card.getAttribute('data-god-title') || 'hitomi gallery';
+      var HTP = window.MPV2 && window.MPV2.Hitomi;
+      var MR3 = window.MPV2 && window.MPV2.MangaReader;
+      if (!htid || !HTP || !MR3) return;
+      adultWarnModal({ title: htt }, function () {
+        if (window.MPV2.toast) window.MPV2.toast('Opening gallery\u2026');
+        HTP.galleryPages(htid).then(function (p) {
+          if (!p || !p.pages || !p.pages.length) throw new Error('no pages');
+          MR3.openReader({ uuid: 'hitomi:' + htid, ctx: {},
+            chapter: { id: 'ht-' + htid, ch: '1', title: p.title, pages: p.pages } });
         }).catch(function () { if (window.MPV2.toast) window.MPV2.toast('Could not open this gallery.'); });
       });
     }

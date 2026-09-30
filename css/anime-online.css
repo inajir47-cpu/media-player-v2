@@ -958,6 +958,7 @@ button.trailer-btn { cursor: pointer; font-family: inherit; }
 .server-tag.sv-reanime { border-color: rgba(96,165,250,.8); color: #bfdbfe; }
 .server-tag.sv-mangadex { border-color: rgba(52,211,153,.8); color: #a7f3d0; }
 .server-tag.sv-nhentai { border-color: rgba(248,113,113,.85); color: #fecaca; }
+.server-tag.sv-hitomi { border-color: rgba(167,139,250,.85); color: #ddd6fe; }
 /* 18+ badge on God Mode nhentai cards (server tag sits top-right). */
 .adult18.god-adult { position: absolute; top: 8px; left: 8px; z-index: 3; }
 .god-langbadges { position: absolute; left: 8px; bottom: 8px; z-index: 3;

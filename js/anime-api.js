@@ -1105,7 +1105,12 @@
     ];
     // nhentai (adult manga): 18+ opt-in only. Direct provider search, same
     // isolation as the other God Mode jobs.
-    if (adultOptIn()) jobs.push(godSettled(godTimeout(godGlobalSearch('nhSearch', query))));
+    // Heliotrope (Hitomi.la mirror) is the adult-manga backup: same gate,
+    // queried in parallel so its results still land when nhentai is down.
+    if (adultOptIn()) {
+      jobs.push(godSettled(godTimeout(godGlobalSearch('nhSearch', query))));
+      jobs.push(godSettled(godTimeout(godGlobalSearch('htSearch', query))));
+    }
     return Promise.all(jobs).then(function (lists) {
       var out = [];
       lists.forEach(function (l) {
