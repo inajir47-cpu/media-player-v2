@@ -576,6 +576,43 @@
   });
   // one document-level closer for all custom dropdowns (registered once)
   document.addEventListener('click', function () { closeAllDd(); });
+
+  /* ----- player session persistence (survive page refresh) ----- */
+  // The watch-history store already persists per-episode position and the
+  // player auto-seeks to it on open — so the session only needs the routing
+  // info (series, episode, provider, language) to rebuild the shell.
+  var PLAYER_SESSION_KEY = 'mpv2_player_session_v1';
+  function savePlayerSession(ctx, n, prov, lang) {
+    try {
+      sessionStorage.setItem(PLAYER_SESSION_KEY, JSON.stringify({
+        ctx: { title: ctx.title, poster: ctx.poster, anilistId: ctx.anilistId,
+               episodes: ctx.episodes, provider: ctx.provider, id: ctx.id,
+               mediaType: ctx.mediaType, isMovie: !!ctx.isMovie },
+        n: n,
+        prov: { name: prov.name, kind: prov.kind || 'en' },
+        lang: lang
+      }));
+    } catch (e) {}
+  }
+  function readPlayerSession() {
+    try {
+      var raw = sessionStorage.getItem(PLAYER_SESSION_KEY);
+      if (!raw) return null;
+      var s = JSON.parse(raw);
+      if (!s || !s.ctx || !s.ctx.title || !s.n || !s.prov || !s.prov.name) return null;
+      return s;
+    } catch (e) { return null; }
+  }
+  function clearPlayerSession() {
+    try { sessionStorage.removeItem(PLAYER_SESSION_KEY); } catch (e) {}
+  }
+  // Flush the freshest playback position on refresh/close so the resume
+  // seek (via the watch-history store) is never more than a second stale.
+  window.addEventListener('beforeunload', function () {
+    if (activeTrack && activeTrack.video) {
+      try { saveTrack(activeTrack.video, activeTrack.track); } catch (e) {}
+    }
+  });
   var lastEmptyToast = 0; // throttle for the no-providers toast in openProviderDialog
   function openProviderDialog(ctx, n, avail) {
     closeDialog();
@@ -697,11 +734,13 @@
     }
     document.removeEventListener('keydown', escClose);
     histPushed = false;
+    clearPlayerSession();
   }
 
   function startWatch(ctx, n, prov, lang) {
     var fresh = !document.querySelector('.st-player');
     var shell = openPlayerShell(ctx, n, prov.name, lang);
+    savePlayerSession(ctx, n, prov, lang);
     var track = { ctx: ctx, n: n, prov: prov, lang: lang };
     var done = false;
     function resolve() {
@@ -1390,4 +1429,15 @@
       checkEpisodeStaged(ctxLike, n, function (avail) { openProviderDialog(ctxLike, n, avail); });
     }
   };
+
+  // Refresh survival: rebuild the player shell from the saved session.
+  // Stream URLs are re-resolved fresh (old ones may have expired); the
+  // watch-history store restores the playback position automatically.
+  (function () {
+    var s = readPlayerSession();
+    if (!s) return;
+    clearPlayerSession(); // consume: startWatch re-saves on success; avoids boot loops on bad data
+    try { startWatch(s.ctx, s.n, s.prov, s.lang); }
+    catch (e) { /* stay on the page; session already consumed */ }
+  })();
 })();
