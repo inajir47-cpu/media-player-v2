@@ -458,8 +458,11 @@
       }
     });
     row.appendChild(playBtn);
-    row.appendChild(saveBtn);
     copy.appendChild(row);
+    // Watchlist sits up in .detail-actions next to Trailer / Watch Order.
+    var actions = copy.querySelector('.detail-actions');
+    if (actions) actions.appendChild(saveBtn);
+    else row.appendChild(saveBtn);
     document.addEventListener('mpv2:history', refresh);
     refresh();
   }
